@@ -1,0 +1,15 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  name: MyString
+  duration_time: 1
+  day: 2025-09-18 21:37:08
+  aluno: one
+  personal: one
+
+two:
+  name: MyString
+  duration_time: 1
+  day: 2025-09-18 21:37:08
+  aluno: two
+  personal: two

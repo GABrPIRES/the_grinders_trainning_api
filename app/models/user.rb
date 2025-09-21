@@ -1,0 +1,12 @@
+# app/models/user.rb
+class User < ApplicationRecord
+    has_secure_password
+  
+    enum :role, { admin: 0, personal: 1, aluno: 2 }
+  
+    validates :name, presence: true
+    validates :email, presence: true, uniqueness: true, format: { with: URI::MailTo::EMAIL_REGEXP }
+  
+    has_one :personal, dependent: :destroy
+    has_one :aluno, dependent: :destroy
+  end

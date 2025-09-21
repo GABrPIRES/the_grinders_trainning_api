@@ -1,0 +1,39 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  birth_date: 2025-09-18
+  weight: 1.5
+  height: 1.5
+  lesao: MyText
+  phone_number: MyString
+  restricao_medica: MyText
+  objetivo: MyText
+  treinos_semana: 1
+  tempo_treino: 1
+  horario_treino: 1
+  pr_supino: 1
+  pr_terra: 1
+  pr_agachamento: 1
+  new_pr_supino: 1
+  new_pr_terra: 1
+  new_pr_agachamento: 1
+  personal: one
+
+two:
+  birth_date: 2025-09-18
+  weight: 1.5
+  height: 1.5
+  lesao: MyText
+  phone_number: MyString
+  restricao_medica: MyText
+  objetivo: MyText
+  treinos_semana: 1
+  tempo_treino: 1
+  horario_treino: 1
+  pr_supino: 1
+  pr_terra: 1
+  pr_agachamento: 1
+  new_pr_supino: 1
+  new_pr_terra: 1
+  new_pr_agachamento: 1
+  personal: two
