@@ -9,10 +9,11 @@ Rails.application.routes.draw do
       post 'login', to: 'sessions#create'
       resource :profile, only: [:show], controller: :profile
       resources :treinos
-      resources :alunos, only: [:index, :show, :create]
+      resources :alunos, only: [:index, :show, :create, :update, :destroy]
       namespace :admin do
-        resources :alunos, only: [:create, :index, :show]
+        resources :alunos, only: [:create, :index, :show, :update, :destroy]
       end
+      get 'meus_treinos', to: 'meus_treinos#index'
     end
   end
 end
