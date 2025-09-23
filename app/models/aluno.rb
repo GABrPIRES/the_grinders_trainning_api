@@ -5,7 +5,7 @@ class Aluno < ApplicationRecord
 
   # Um 'Aluno' pertence a um 'Personal' (treinador).
   # A associação é opcional, pois um aluno pode existir sem um treinador.
-  belongs_to :personal, optional: true
+  belongs_to :personal
 
   # Relações com outras partes do sistema
   has_many :treinos, dependent: :destroy

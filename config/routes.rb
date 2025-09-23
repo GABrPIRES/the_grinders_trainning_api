@@ -5,10 +5,14 @@ Rails.application.routes.draw do
   namespace :api do
     namespace :v1 do
       # Cria a rota POST /api/v1/users que aponta para a action 'create' do UsersController
-      resources :users, only: [:create]
+      resources :users, only: [:create, :destroy]
       post 'login', to: 'sessions#create'
       resource :profile, only: [:show], controller: :profile
       resources :treinos
+      resources :alunos, only: [:index, :show, :create]
+      namespace :admin do
+        resources :alunos, only: [:create, :index, :show]
+      end
     end
   end
 end

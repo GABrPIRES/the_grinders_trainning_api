@@ -1,6 +1,7 @@
 # app/controllers/api/v1/treinos_controller.rb
 class Api::V1::TreinosController < ApplicationController
     before_action :authenticate_request
+    before_action :authorize_admin_or_coach!
     before_action :set_treino, only: [:show, :update, :destroy]
   
     # GET /api/v1/treinos

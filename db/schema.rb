@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_09_19_003713) do
+ActiveRecord::Schema[8.0].define(version: 2025_09_21_193138) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -35,6 +35,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_19_003713) do
     t.integer "new_pr_agachamento"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.uuid "personal_id", null: false
+    t.index ["personal_id"], name: "index_alunos_on_personal_id"
     t.index ["user_id"], name: "index_alunos_on_user_id"
   end
 
@@ -128,6 +130,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_19_003713) do
     t.index ["email"], name: "index_users_on_email", unique: true
   end
 
+  add_foreign_key "alunos", "personals"
   add_foreign_key "alunos", "users"
   add_foreign_key "assinaturas", "alunos"
   add_foreign_key "assinaturas", "planos"
