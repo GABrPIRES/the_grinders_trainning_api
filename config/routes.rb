@@ -10,6 +10,8 @@ Rails.application.routes.draw do
       resource :profile, only: [:show, :update], controller: :profile
       resources :treinos
       resources :alunos, only: [:index, :show, :create, :update, :destroy]
+      resources :planos
+      resources :assinaturas, only: [:index, :show, :create, :destroy]
       namespace :admin do
         resources :alunos, only: [:create, :index, :show, :update, :destroy]
       end
