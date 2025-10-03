@@ -23,17 +23,41 @@ class Api::V1::Admin::AlunosController < ApplicationController
   
     # POST /api/v1/admin/alunos
     def create
-      ActiveRecord::Base.transaction do
-        @user = User.new(aluno_user_params_for_create)
+        all_params = params.require(:aluno).permit(
+          :name, :email, :password, :password_confirmation,
+          :phone_number, :personal_id
+        )
+        
+        user_params = all_params.slice(:name, :email, :password, :password_confirmation)
+        aluno_params = all_params.slice(:phone_number, :personal_id)
+      
+        @user = User.new(user_params)
         @user.role = :aluno
+      
+        # PASSO 1: Verificamos se o User é válido antes de salvar.
+        unless @user.valid?
+          render json: { model: 'User', errors: @user.errors.full_messages }, status: :unprocessable_entity
+          return
+        end
+        
         @user.save!
-  
-        @aluno = @user.create_aluno!(aluno_profile_params)
+      
+        # PASSO 2: Construímos o Aluno, mas ainda não salvamos.
+        @aluno = @user.build_aluno(aluno_params)
+      
+        # PASSO 3 (O MAIS IMPORTANTE): Verificamos se o Aluno é válido.
+        # Se não for, retornamos a mensagem de erro exata.
+        unless @aluno.valid?
+          @user.destroy # Limpamos o usuário órfão que acabamos de criar.
+          render json: { model: 'Aluno', errors: @aluno.errors.full_messages }, status: :unprocessable_entity
+          return
+        end
+      
+        # Se ambos forem válidos, finalmente salvamos o aluno.
+        @aluno.save!
+        
+        render json: @aluno, include: :user, status: :created
       end
-      render json: @aluno, status: :created
-    rescue ActiveRecord::RecordInvalid => e
-      render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
-    end
   
     # PATCH/PUT /api/v1/admin/alunos/:id
     def update

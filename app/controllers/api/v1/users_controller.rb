@@ -1,7 +1,24 @@
 # app/controllers/api/v1/users_controller.rb
 class Api::V1::UsersController < ApplicationController
     before_action :authenticate_request
-    before_action :authorize_admin!, only: [:create, :destroy]
+    before_action :authorize_admin!, only: [:create, :destroy, :index]
+    before_action :set_user, only: [:show, :update, :destroy]
+
+     # GET /api/v1/users
+    def index
+        scope = User.all
+        scope = scope.where(role: params[:role]) if params[:role].present?
+        if params[:search].present?
+        scope = scope.where("name ILIKE ? OR email ILIKE ?", "%#{params[:search]}%", "%#{params[:search]}%")
+        end
+        @users = scope.order(:name)
+        render json: @users, except: :password_digest
+    end
+
+    # GET /api/v1/users/:id
+    def show
+        render json: @user, except: :password_digest
+    end
 
     # Action para criar um novo usuário (POST /api/v1/users)
     def create
@@ -21,6 +38,16 @@ class Api::V1::UsersController < ApplicationController
         end
     end
 
+    # PATCH/PUT /api/v1/users/:id
+    def update
+        user_params_for_update = user_params.delete_if { |k, v| k.include?('password') && v.blank? }
+        if @user.update(user_params_for_update)
+        render json: @user, except: :password_digest
+        else
+        render json: @user.errors, status: :unprocessable_entity
+        end
+    end
+
     # DELETE /api/v1/users/:id
     def destroy
         user = User.find(params[:id])
@@ -32,6 +59,12 @@ class Api::V1::UsersController < ApplicationController
     
     private
     
+    def set_user
+        @user = User.find(params[:id])
+    rescue ActiveRecord::RecordNotFound
+        render json: { error: 'Usuário não encontrado' }, status: :not_found
+    end
+
     def user_params
         params.require(:user).permit(:name, :email, :password, :password_confirmation, :role)
     end

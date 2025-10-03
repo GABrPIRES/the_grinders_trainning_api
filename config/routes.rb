@@ -4,8 +4,7 @@ Rails.application.routes.draw do
   # Isso gera URLs como /api/v1/recurso
   namespace :api do
     namespace :v1 do
-      # Cria a rota POST /api/v1/users que aponta para a action 'create' do UsersController
-      resources :users, only: [:create, :destroy]
+      resources :users, only: [:create, :destroy, :index, :show, :update]
       post 'login', to: 'sessions#create'
       resource :profile, only: [:show, :update], controller: :profile
       resources :treinos
@@ -14,6 +13,7 @@ Rails.application.routes.draw do
       resources :assinaturas, only: [:index, :show, :create, :destroy]
       namespace :admin do
         resources :alunos, only: [:create, :index, :show, :update, :destroy]
+        resources :coaches, only: [:index]
       end
       get 'meus_treinos', to: 'meus_treinos#index'
       get 'meus_treinos/:id', to: 'meus_treinos#show'
