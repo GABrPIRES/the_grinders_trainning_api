@@ -6,7 +6,9 @@ Rails.application.routes.draw do
     namespace :v1 do
       resources :users, only: [:create, :destroy, :index, :show, :update]
       post 'login', to: 'sessions#create'
-      resource :profile, only: [:show, :update], controller: :profile
+      resource :profile, only: [:show, :update], controller: :profile do
+        post 'change_password', on: :collection
+      end
       resources :treinos
       resources :alunos, only: [:index, :show, :create, :update, :destroy]
       resources :planos

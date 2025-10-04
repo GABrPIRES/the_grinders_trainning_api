@@ -34,6 +34,22 @@ class Api::V1::ProfileController < ApplicationController
     rescue ActiveRecord::RecordInvalid => e
       render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
     end
+
+    # POST /api/v1/profile/change_password
+    def change_password
+        # Verifica se a senha atual fornecida está correta
+        unless @current_user.authenticate(params[:current_password])
+        render json: { error: 'Senha atual incorreta' }, status: :unauthorized
+        return
+        end
+
+        # Tenta atualizar a senha com a nova
+        if @current_user.update(password: params[:new_password], password_confirmation: params[:password_confirmation])
+        render json: { message: 'Senha alterada com sucesso!' }, status: :ok
+        else
+        render json: { errors: @current_user.errors.full_messages }, status: :unprocessable_entity
+        end
+    end
   
     private
   

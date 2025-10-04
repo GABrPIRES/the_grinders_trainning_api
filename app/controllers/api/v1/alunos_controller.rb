@@ -6,8 +6,12 @@ class Api::V1::AlunosController < ApplicationController
 
     # GET /api/v1/alunos
     def index
-        @alunos = @current_user.personal.alunos.joins(:user).order('users.name')
-        render json: @alunos, include: :user     
+        # Adicionamos a lógica de busca por nome ou email
+        @alunos = @current_user.personal.alunos.joins(:user)
+        if params[:search].present?
+          @alunos = @alunos.where("users.name ILIKE ? OR users.email ILIKE ?", "%#{params[:search]}%", "%#{params[:search]}%")
+        end
+        render json: @alunos.order('users.name'), include: :user
     end
   
     # GET /api/v1/alunos/:id
