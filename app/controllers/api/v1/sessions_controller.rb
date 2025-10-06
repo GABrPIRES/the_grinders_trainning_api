@@ -2,6 +2,10 @@
 class Api::V1::SessionsController < ApplicationController
     def create
       user = User.find_by(email: params[:email])
+
+      if user&.inativo?
+        return render json: { error: 'Sua conta está desativada.' }, status: :unauthorized
+      end
   
       if user&.authenticate(params[:password])
         payload = { user_id: user.id, role: user.role }

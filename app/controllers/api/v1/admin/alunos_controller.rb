@@ -18,56 +18,86 @@ class Api::V1::Admin::AlunosController < ApplicationController
   
     # GET /api/v1/admin/alunos/:id
     def show
-      render json: @aluno, include: :user
+        render json: @aluno, include: [:user, :assinaturas]
     end
   
     # POST /api/v1/admin/alunos
     def create
         all_params = params.require(:aluno).permit(
           :name, :email, :password, :password_confirmation,
-          :phone_number, :personal_id
+          :phone_number, :personal_id, :plano_id # 1. Permitimos o novo parâmetro
         )
-        
-        user_params = all_params.slice(:name, :email, :password, :password_confirmation)
-        aluno_params = all_params.slice(:phone_number, :personal_id)
       
-        @user = User.new(user_params)
-        @user.role = :aluno
+        ActiveRecord::Base.transaction do
+          user_params = all_params.slice(:name, :email, :password, :password_confirmation)
+          aluno_params = all_params.slice(:phone_number, :personal_id)
+          plano_id = all_params[:plano_id]
       
-        # PASSO 1: Verificamos se o User é válido antes de salvar.
-        unless @user.valid?
-          render json: { model: 'User', errors: @user.errors.full_messages }, status: :unprocessable_entity
-          return
+          @user = User.new(user_params)
+          @user.role = :aluno
+          @user.save!
+      
+          @aluno = @user.create_aluno!(aluno_params)
+      
+          # 2. Lógica para criar a assinatura se um plano for selecionado
+          if plano_id.present?
+            plano = Plano.find(plano_id)
+            start_date = Date.today
+            end_date = start_date + plano.duration.days
+      
+            @aluno.assinaturas.create!(
+              plano: plano,
+              start_date: start_date,
+              end_date: end_date,
+              status: :ativo
+            )
+          end
         end
-        
-        @user.save!
       
-        # PASSO 2: Construímos o Aluno, mas ainda não salvamos.
-        @aluno = @user.build_aluno(aluno_params)
-      
-        # PASSO 3 (O MAIS IMPORTANTE): Verificamos se o Aluno é válido.
-        # Se não for, retornamos a mensagem de erro exata.
-        unless @aluno.valid?
-          @user.destroy # Limpamos o usuário órfão que acabamos de criar.
-          render json: { model: 'Aluno', errors: @aluno.errors.full_messages }, status: :unprocessable_entity
-          return
-        end
-      
-        # Se ambos forem válidos, finalmente salvamos o aluno.
-        @aluno.save!
-        
         render json: @aluno, include: :user, status: :created
-      end
+    rescue ActiveRecord::RecordInvalid => e
+        render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+    end
   
     # PATCH/PUT /api/v1/admin/alunos/:id
     def update
-      user_params = aluno_user_params_for_update.delete_if { |k, v| k.include?('password') && v.blank? }
-      
-      if @aluno.user.update(user_params) && @aluno.update(aluno_profile_params)
+        # Permite todos os parâmetros de uma vez
+        all_params = params.require(:aluno).permit(
+          :name, :email, :password, :password_confirmation, :status, # Adiciona status
+          :phone_number, :personal_id, :plano_id # Adiciona plano_id
+        )
+    
+        ActiveRecord::Base.transaction do
+          user_params = all_params.slice(:name, :email, :password, :password_confirmation, :status)
+          aluno_params = all_params.slice(:phone_number, :personal_id)
+          plano_id = all_params[:plano_id]
+    
+          # Remove a senha se estiver em branco
+          user_params.delete_if { |k, v| k.include?('password') && v.blank? }
+    
+          @aluno.user.update!(user_params)
+          @aluno.update!(aluno_params)
+    
+          # Lógica para gerenciar a assinatura
+          if plano_id.present?
+            plano = Plano.find(plano_id)
+            assinatura = @aluno.assinaturas.order(created_at: :desc).first
+    
+            # Se não há assinatura ou a assinatura atual é para um plano diferente
+            if assinatura.nil? || assinatura.plano_id.to_s != plano_id
+              start_date = Date.today
+              end_date = start_date + plano.duration.days
+              @aluno.assinaturas.create!(plano: plano, start_date: start_date, end_date: end_date, status: :ativo)
+            end
+          else
+            # Se "Nenhum plano" for selecionado, cancela a assinatura ativa
+            @aluno.assinaturas.ativo.update_all(status: :cancelado)
+          end
+        end
+    
         render json: @aluno, include: :user
-      else
-        render json: { errors: @aluno.user.errors.full_messages + @aluno.errors.full_messages }, status: :unprocessable_entity
-      end
+    rescue ActiveRecord::RecordInvalid => e
+        render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
     end
   
     # DELETE /api/v1/admin/alunos/:id

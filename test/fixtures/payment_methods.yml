@@ -1,0 +1,11 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  method_type: 1
+  details: 
+  personal: one
+
+two:
+  method_type: 1
+  details: 
+  personal: two

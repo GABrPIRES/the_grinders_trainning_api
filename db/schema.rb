@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_09_21_193138) do
+ActiveRecord::Schema[8.0].define(version: 2025_10_05_001258) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -73,6 +73,15 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_21_193138) do
     t.index ["personal_id"], name: "index_pagamentos_on_personal_id"
   end
 
+  create_table "payment_methods", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.integer "method_type", null: false
+    t.jsonb "details", default: {}, null: false
+    t.uuid "personal_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["personal_id"], name: "index_payment_methods_on_personal_id"
+  end
+
   create_table "personals", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "user_id", null: false
     t.text "bio"
@@ -127,6 +136,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_21_193138) do
     t.integer "role", default: 2, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "status", default: 0, null: false
     t.index ["email"], name: "index_users_on_email", unique: true
   end
 
@@ -137,6 +147,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_21_193138) do
   add_foreign_key "exercicios", "treinos"
   add_foreign_key "pagamentos", "alunos"
   add_foreign_key "pagamentos", "personals"
+  add_foreign_key "payment_methods", "personals"
   add_foreign_key "personals", "users"
   add_foreign_key "planos", "personals"
   add_foreign_key "sections", "exercicios"

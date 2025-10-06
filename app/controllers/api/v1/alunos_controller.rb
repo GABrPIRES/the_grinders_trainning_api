@@ -24,32 +24,79 @@ class Api::V1::AlunosController < ApplicationController
 
     # POST /api/v1/alunos
     def create
+        all_params = params.require(:aluno).permit(
+          :name, :email, :password, :password_confirmation,
+          :phone_number, :plano_id # Permitimos o novo parâmetro
+        )
+      
         ActiveRecord::Base.transaction do
-        # CORREÇÃO: Agora o 'aluno_user_params' inclui a senha
-        @user = User.new(aluno_user_params)
-        @user.role = :aluno
-        @user.save!
-
-        @aluno = @user.create_aluno!(aluno_profile_params.merge(personal: @current_user.personal))
+          user_params = all_params.slice(:name, :email, :password, :password_confirmation)
+          aluno_profile_params = all_params.slice(:phone_number)
+          plano_id = all_params[:plano_id]
+      
+          @user = User.new(user_params)
+          @user.role = :aluno
+          @user.save!
+      
+          @aluno = @user.create_aluno!(aluno_profile_params.merge(personal: @current_user.personal))
+      
+          if plano_id.present?
+            # Garante que o coach só pode usar seus próprios planos
+            plano = @current_user.personal.planos.find(plano_id)
+            start_date = Date.today
+            end_date = start_date + plano.duration.days
+      
+            @aluno.assinaturas.create!(
+              plano: plano,
+              start_date: start_date,
+              end_date: end_date,
+              status: :ativo
+            )
+          end
         end
-
+      
         render json: @aluno, include: :user, status: :created
-    rescue ActiveRecord::RecordInvalid => e
+      rescue ActiveRecord::RecordInvalid => e
         render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
-    end
+      end
 
     # PATCH/PUT /api/v1/alunos/:id
     def update
-        # Filtra os parâmetros do usuário. Se a senha estiver em branco, remove para não apagar a senha existente.
-        user_params_for_update = aluno_user_params_for_update
-        user_params_for_update.delete_if { |key, value| key.include?('password') && value.blank? }
-
-        if @aluno.user.update(user_params_for_update) && @aluno.update(aluno_profile_params)
-        render json: @aluno, include: :user
-        else
-        render json: { errors: @aluno.user.errors.full_messages + @aluno.errors.full_messages }, status: :unprocessable_entity
+        all_params = params.require(:aluno).permit(
+          :name, :email, :password, :password_confirmation, :status,
+          :phone_number, :weight, :objetivo, :plano_id
+        )
+    
+        ActiveRecord::Base.transaction do
+          user_params = all_params.slice(:name, :email, :password, :password_confirmation, :status)
+          aluno_params = all_params.slice(:phone_number, :weight, :objetivo)
+          plano_id = all_params[:plano_id]
+    
+          user_params.delete_if { |k, v| k.include?('password') && v.blank? }
+    
+          @aluno.user.update!(user_params)
+          @aluno.update!(aluno_params)
+    
+          # Lógica para gerenciar a assinatura
+          if plano_id.present?
+            plano = @current_user.personal.planos.find(plano_id) # Garante que o plano é do coach
+            assinatura = @aluno.assinaturas.ativo.first
+    
+            if assinatura.nil? || assinatura.plano_id.to_s != plano_id
+              assinatura&.update(status: :cancelado) # Cancela a antiga se for diferente
+              start_date = Date.today
+              end_date = start_date + plano.duration.days
+              @aluno.assinaturas.create!(plano: plano, start_date: start_date, end_date: end_date, status: :ativo)
+            end
+          else
+            @aluno.assinaturas.ativo.update_all(status: :cancelado)
+          end
         end
-    end
+    
+        render json: @aluno, include: :user
+      rescue ActiveRecord::RecordInvalid => e
+        render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+      end
 
     # DELETE /api/v1/alunos/:id
     def destroy
