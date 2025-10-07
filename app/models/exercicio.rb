@@ -3,7 +3,7 @@ class Exercicio < ApplicationRecord
   belongs_to :treino
 
   # Um exercício tem muitas 'sections' (séries).
-  has_many :sections, dependent: :destroy
+  has_many :sections, -> { order(created_at: :asc) }, dependent: :destroy
 
   accepts_nested_attributes_for :sections, allow_destroy: true
 

@@ -7,14 +7,28 @@ class Api::V1::Admin::AlunosController < ApplicationController
   
     # GET /api/v1/admin/alunos
     def index
-      base_scope = Aluno.joins(:user)
-      if params[:personal_id]
-        @alunos = base_scope.where(personal_id: params[:personal_id]).order('users.name')
-      else
-        @alunos = base_scope.all.order('users.name')
+        # Define valores padrão para a paginação
+        page = params.fetch(:page, 1).to_i
+        limit = params.fetch(:limit, 10).to_i
+    
+        # Inicia a busca com o JOIN e inclui as associações para evitar N+1 queries
+        scope = Aluno.joins(:user).includes(:user)
+    
+        # Aplica os filtros
+        scope = scope.where(personal_id: params[:personal_id]) if params[:personal_id].present?
+        if params[:search].present?
+          scope = scope.where("users.name ILIKE ? OR users.email ILIKE ?", "%#{params[:search]}%", "%#{params[:search]}%")
+        end
+    
+        # Conta o total de registros ANTES de paginar
+        total = scope.count
+    
+        # Aplica a ordenação e a paginação
+        @alunos = scope.order('users.name').offset((page - 1) * limit).limit(limit)
+        
+        # Retorna os alunos e o total no mesmo JSON
+        render json: { alunos: @alunos.as_json(include: :user), total: total }
       end
-      render json: @alunos, include: :user
-    end
   
     # GET /api/v1/admin/alunos/:id
     def show

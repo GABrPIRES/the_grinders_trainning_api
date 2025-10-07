@@ -5,15 +5,27 @@ class Api::V1::UsersController < ApplicationController
     before_action :set_user, only: [:show, :update, :destroy]
 
      # GET /api/v1/users
-    def index
+     def index
+        # Define valores padrão para a paginação
+        page = params.fetch(:page, 1).to_i
+        limit = params.fetch(:limit, 10).to_i
+    
         scope = User.all
         scope = scope.where(role: params[:role]) if params[:role].present?
         if params[:search].present?
-        scope = scope.where("name ILIKE ? OR email ILIKE ?", "%#{params[:search]}%", "%#{params[:search]}%")
+          scope = scope.where("name ILIKE ? OR email ILIKE ?", "%#{params[:search]}%", "%#{params[:search]}%")
         end
-        @users = scope.order(:name)
-        render json: @users, except: :password_digest
-    end
+    
+        # Conta o total de registros ANTES de aplicar o limite da página
+        total = scope.count
+    
+        # Aplica a paginação na query
+        @users = scope.order(:name).offset((page - 1) * limit).limit(limit)
+        
+        # Retorna os usuários e o total no mesmo JSON
+        render json: { users: @users.as_json(except: :password_digest), total: total }
+      end
+    
 
     # GET /api/v1/users/:id
     def show

@@ -24,6 +24,7 @@ Rails.application.routes.draw do
       get 'meus_treinos/:id', to: 'meus_treinos#show'
       resource :meu_coach, only: [:show], controller: 'meu_coach'
       resource :minha_assinatura, only: [:show], controller: 'minha_assinatura'
+      resources :sections, only: [:update]
     end
   end
 end
