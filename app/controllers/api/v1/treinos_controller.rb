@@ -6,16 +6,33 @@ class Api::V1::TreinosController < ApplicationController
   
     # GET /api/v1/treinos
     def index
-      # CORREÇÃO AQUI
-      treinos_scope = @current_user.personal.treinos
-  
-      if params[:aluno_id]
-        @treinos = treinos_scope.where(aluno_id: params[:aluno_id]).order(day: :desc)
-      else
-        @treinos = treinos_scope.order(day: :desc)
+        # Segurança: Garante que estamos buscando treinos apenas de um aluno específico do coach logado
+        aluno = @current_user.personal.alunos.find(params[:aluno_id])
+        scope = aluno.treinos
+    
+        # 1. Filtro por nome do treino (search)
+        if params[:search].present?
+          scope = scope.where("name ILIKE ?", "%#{params[:search]}%")
+        end
+    
+        # 2. Filtro por data inicial
+        if params[:start_date].present?
+          scope = scope.where("day >= ?", params[:start_date])
+        end
+    
+        # 3. Filtro por data final
+        if params[:end_date].present?
+          scope = scope.where("day <= ?", params[:end_date])
+        end
+    
+        # 4. Ordenação (padrão: data mais recente primeiro)
+        order_direction = params[:sort_order] == 'asc' ? :asc : :desc
+        scope = scope.order(day: order_direction)
+        
+        @treinos = scope.includes(:exercicios) # Usamos includes para otimização
+    
+        render json: @treinos.as_json(include: :exercicios)
       end
-      render json: @treinos, include: { exercicios: { include: :sections } }
-    end
   
     # GET /api/v1/treinos/:id
     def show

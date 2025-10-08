@@ -6,21 +6,67 @@ class Api::V1::AlunosController < ApplicationController
 
     # GET /api/v1/alunos
     def index
-        # Adicionamos a lógica de busca por nome ou email
-        @alunos = @current_user.personal.alunos.joins(:user)
+        # Carregamos previamente todas as associações para evitar N+1 queries
+        base_scope = @current_user.personal.alunos.includes(:user, :assinaturas, :treinos)
+    
         if params[:search].present?
-          @alunos = @alunos.where("users.name ILIKE ? OR users.email ILIKE ?", "%#{params[:search]}%", "%#{params[:search]}%")
+          base_scope = base_scope.where("users.name ILIKE ? OR users.email ILIKE ?", "%#{params[:search]}%", "%#{params[:search]}%")
         end
-        render json: @alunos.order('users.name'), include: :user
+    
+        # A paginação será adicionada aqui no futuro
+        @alunos = base_scope.order('users.name')
+        
+        # Construímos uma resposta JSON customizada
+        alunos_com_detalhes = @alunos.map do |aluno|
+          assinatura_ativa = aluno.assinaturas.find(&:ativo?)
+          proximo_treino = aluno.treinos.where('day >= ?', Date.today).order(day: :asc).first
+          ultimo_treino_atualizado = aluno.treinos.order(updated_at: :desc).first
+    
+          aluno.as_json(include: :user).merge(
+            pagamento: {
+              vencimento: assinatura_ativa&.end_date,
+              status: assinatura_ativa&.status
+            },
+            plano: {
+              nome: assinatura_ativa&.plano&.name
+            },
+            treino_info: {
+              proximo_treino: proximo_treino&.day,
+              ultima_atualizacao: ultimo_treino_atualizado&.updated_at
+            }
+          )
+        end
+    
+        # A resposta da API agora é um objeto com 'alunos' (com os detalhes) e 'total'
+        render json: { alunos: alunos_com_detalhes, total: alunos_com_detalhes.size }
     end
+    
   
     # GET /api/v1/alunos/:id
     def show
-      @aluno = @current_user.personal.alunos.find(params[:id])
-      render json: @aluno, include: :user
-    rescue ActiveRecord::RecordNotFound
-      render json: { error: 'Aluno não encontrado ou não pertence a este coach' }, status: :not_found
-    end
+        # A busca do aluno já é feita pelo before_action :set_aluno
+        
+        # Construímos a resposta JSON customizada, assim como no 'index'
+        assinatura_ativa = @aluno.assinaturas.find(&:ativo?)
+        proximo_treino = @aluno.treinos.where('day >= ?', Date.today).order(day: :asc).first
+        ultimo_treino_atualizado = @aluno.treinos.order(updated_at: :desc).first
+    
+        aluno_com_detalhes = @aluno.as_json(include: :user).merge(
+          pagamento: {
+            vencimento: assinatura_ativa&.end_date,
+            status: assinatura_ativa&.status
+          },
+          plano: {
+            nome: assinatura_ativa&.plano&.name
+          },
+          treino_info: {
+            proximo_treino: proximo_treino&.day,
+            ultima_atualizacao: ultimo_treino_atualizado&.updated_at
+          }
+        )
+        
+        render json: aluno_com_detalhes
+      end
 
     # POST /api/v1/alunos
     def create
