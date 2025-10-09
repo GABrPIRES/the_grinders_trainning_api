@@ -6,8 +6,8 @@ class Api::V1::AlunosController < ApplicationController
 
     # GET /api/v1/alunos
     def index
-        # Carregamos previamente todas as associações para evitar N+1 queries
-        base_scope = @current_user.personal.alunos.includes(:user, :assinaturas, :treinos)
+        # --- CORREÇÃO 1: Adicionamos :pagamentos para otimização ---
+        base_scope = @current_user.personal.alunos.includes(:user, :assinaturas, :treinos, :pagamentos)
     
         if params[:search].present?
           base_scope = base_scope.where("users.name ILIKE ? OR users.email ILIKE ?", "%#{params[:search]}%", "%#{params[:search]}%")
@@ -18,17 +18,23 @@ class Api::V1::AlunosController < ApplicationController
         
         # Construímos uma resposta JSON customizada
         alunos_com_detalhes = @alunos.map do |aluno|
+          # --- CORREÇÃO 2: Buscamos o próximo pagamento em vez da assinatura ---
+          # Procura o pagamento não-pago com a data de vencimento mais próxima.
+          proximo_pagamento = aluno.pagamentos.where.not(status: :pago).order(due_date: :asc).first
           assinatura_ativa = aluno.assinaturas.find(&:ativo?)
+          # Mantemos a lógica de treino
           proximo_treino = aluno.treinos.where('day >= ?', Date.today).order(day: :asc).first
           ultimo_treino_atualizado = aluno.treinos.order(updated_at: :desc).first
     
           aluno.as_json(include: :user).merge(
             pagamento: {
-              vencimento: assinatura_ativa&.end_date,
+              # --- CORREÇÃO 3: Usamos os dados do 'proximo_pagamento' ---
+              vencimento: proximo_pagamento&.due_date,
               status: assinatura_ativa&.status
             },
             plano: {
-              nome: assinatura_ativa&.plano&.name
+              # A busca pelo plano continua a mesma, via assinatura
+              nome: aluno.assinaturas.find(&:ativo?)&.plano&.name
             },
             treino_info: {
               proximo_treino: proximo_treino&.day,
@@ -37,7 +43,6 @@ class Api::V1::AlunosController < ApplicationController
           )
         end
     
-        # A resposta da API agora é um objeto com 'alunos' (com os detalhes) e 'total'
         render json: { alunos: alunos_com_detalhes, total: alunos_com_detalhes.size }
     end
     
@@ -49,11 +54,12 @@ class Api::V1::AlunosController < ApplicationController
         # Construímos a resposta JSON customizada, assim como no 'index'
         assinatura_ativa = @aluno.assinaturas.find(&:ativo?)
         proximo_treino = @aluno.treinos.where('day >= ?', Date.today).order(day: :asc).first
+        proximo_pagamento = @aluno.pagamentos.where.not(status: :pago).order(due_date: :asc).first
         ultimo_treino_atualizado = @aluno.treinos.order(updated_at: :desc).first
     
         aluno_com_detalhes = @aluno.as_json(include: :user).merge(
           pagamento: {
-            vencimento: assinatura_ativa&.end_date,
+            vencimento: proximo_pagamento&.due_date,
             status: assinatura_ativa&.status
           },
           plano: {
