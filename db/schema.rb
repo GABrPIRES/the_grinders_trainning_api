@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_10_05_001258) do
+ActiveRecord::Schema[8.0].define(version: 2025_10_09_235128) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -117,16 +117,29 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_05_001258) do
     t.index ["exercicio_id"], name: "index_sections_on_exercicio_id"
   end
 
+  create_table "training_blocks", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "title"
+    t.integer "weeks_duration", default: 5
+    t.uuid "personal_id", null: false
+    t.date "start_date"
+    t.date "end_date"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.uuid "aluno_id"
+    t.index ["aluno_id"], name: "index_training_blocks_on_aluno_id"
+    t.index ["personal_id"], name: "index_training_blocks_on_personal_id"
+  end
+
   create_table "treinos", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "name", null: false
     t.integer "duration_time", null: false
     t.datetime "day", null: false
-    t.uuid "aluno_id", null: false
     t.uuid "personal_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["aluno_id"], name: "index_treinos_on_aluno_id"
+    t.uuid "week_id"
     t.index ["personal_id"], name: "index_treinos_on_personal_id"
+    t.index ["week_id"], name: "index_treinos_on_week_id"
   end
 
   create_table "users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -140,6 +153,16 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_05_001258) do
     t.index ["email"], name: "index_users_on_email", unique: true
   end
 
+  create_table "weeks", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.integer "week_number"
+    t.uuid "training_block_id", null: false
+    t.date "start_date"
+    t.date "end_date"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["training_block_id"], name: "index_weeks_on_training_block_id"
+  end
+
   add_foreign_key "alunos", "personals"
   add_foreign_key "alunos", "users"
   add_foreign_key "assinaturas", "alunos"
@@ -151,6 +174,9 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_05_001258) do
   add_foreign_key "personals", "users"
   add_foreign_key "planos", "personals"
   add_foreign_key "sections", "exercicios"
-  add_foreign_key "treinos", "alunos"
+  add_foreign_key "training_blocks", "alunos"
+  add_foreign_key "training_blocks", "personals"
   add_foreign_key "treinos", "personals"
+  add_foreign_key "treinos", "weeks"
+  add_foreign_key "weeks", "training_blocks"
 end

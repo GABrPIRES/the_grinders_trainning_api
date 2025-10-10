@@ -25,6 +25,10 @@ Rails.application.routes.draw do
       resource :meu_coach, only: [:show], controller: 'meu_coach'
       resource :minha_assinatura, only: [:show], controller: 'minha_assinatura'
       resources :sections, only: [:update]
+      resources :alunos do
+        resources :training_blocks, only: [:index, :create]
+      end
+      resources :training_blocks, only: [:show, :update, :destroy]
     end
   end
 end

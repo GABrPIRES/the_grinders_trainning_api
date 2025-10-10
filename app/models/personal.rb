@@ -9,6 +9,7 @@ class Personal < ApplicationRecord
     # o campo 'personal_id' dos seus alunos será setado para nulo, mas os alunos não serão deletados.
     has_many :alunos, foreign_key: 'personal_id', dependent: :nullify
     has_many :payment_methods, dependent: :destroy
+    has_many :training_blocks, dependent: :destroy
  
     # Relações com outras partes do sistema
     has_many :treinos, dependent: :destroy

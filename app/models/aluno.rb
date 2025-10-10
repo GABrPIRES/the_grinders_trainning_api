@@ -11,4 +11,5 @@ class Aluno < ApplicationRecord
   has_many :treinos, dependent: :destroy
   has_many :assinaturas, dependent: :destroy
   has_many :pagamentos, dependent: :destroy
+  has_many :training_blocks, dependent: :destroy
 end
