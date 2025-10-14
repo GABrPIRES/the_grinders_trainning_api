@@ -2,48 +2,32 @@
 class Api::V1::TreinosController < ApplicationController
     before_action :authenticate_request
     before_action :authorize_admin_or_coach!
+    
+    # ATUALIZAÇÃO: Carrega a semana correta para index e create
+    before_action :set_week, only: [:index, :create]
+    # ATUALIZAÇÃO: Mantém o set_treino para as outras ações
     before_action :set_treino, only: [:show, :update, :destroy]
   
-    # GET /api/v1/treinos
+    # GET /api/v1/weeks/:week_id/treinos
     def index
-        # Segurança: Garante que estamos buscando treinos apenas de um aluno específico do coach logado
-        aluno = @current_user.personal.alunos.find(params[:aluno_id])
-        scope = aluno.treinos
-    
-        # 1. Filtro por nome do treino (search)
-        if params[:search].present?
-          scope = scope.where("name ILIKE ?", "%#{params[:search]}%")
-        end
-    
-        # 2. Filtro por data inicial
-        if params[:start_date].present?
-          scope = scope.where("day >= ?", params[:start_date])
-        end
-    
-        # 3. Filtro por data final
-        if params[:end_date].present?
-          scope = scope.where("day <= ?", params[:end_date])
-        end
-    
-        # 4. Ordenação (padrão: data mais recente primeiro)
-        order_direction = params[:sort_order] == 'asc' ? :asc : :desc
-        scope = scope.order(day: order_direction)
-        
-        @treinos = scope.includes(:exercicios) # Usamos includes para otimização
-    
+        # ATUALIZAÇÃO: Busca treinos aninhados na semana
+        @treinos = @week.treinos.order(day: :asc)
         render json: @treinos.as_json(include: :exercicios)
-      end
+    end
   
     # GET /api/v1/treinos/:id
     def show
       render json: @treino, include: { exercicios: { include: :sections } }
     end
   
-    # POST /api/v1/treinos
+    # POST /api/v1/weeks/:week_id/treinos
     def create
-      # CORREÇÃO AQUI
-      @treino = @current_user.personal.treinos.build(treino_params)
-  
+      # ATUALIZAÇÃO: Cria o treino a partir da semana
+      @treino = @week.treinos.build(treino_params)
+      
+      # ATUALIZAÇÃO: Associa o personal_id do bloco ao treino
+      @treino.personal_id = @week.training_block.personal_id
+
       if @treino.save
         render json: @treino, include: { exercicios: { include: :sections } }, status: :created
       else
@@ -67,20 +51,30 @@ class Api::V1::TreinosController < ApplicationController
     end
   
     private
+
+    def set_week
+      # Garante que o coach possa acessar a semana
+      @week = Week.joins(training_block: :personal)
+                  .where(training_blocks: { personal_id: @current_user.personal.id })
+                  .find(params[:week_id])
+    rescue ActiveRecord::RecordNotFound
+      render json: { error: 'Semana não encontrada.' }, status: :not_found
+    end
   
     def set_treino
-      # CORREÇÃO AQUI
+      # Esta lógica continua a mesma, pois o treino ainda tem um personal_id
       @treino = @current_user.personal.treinos.find(params[:id])
     rescue ActiveRecord::RecordNotFound
       render json: { error: 'Treino não encontrado' }, status: :not_found
     end
   
     def treino_params
+      # ATUALIZAÇÃO: Removemos aluno_id, pois ele não existe mais no treino
       params.require(:treino).permit(
         :name, 
         :duration_time, 
-        :day, 
-        :aluno_id,
+        :day,
+        # :aluno_id, <-- REMOVIDO
         exercicios_attributes: [
           :id, 
           :name, 

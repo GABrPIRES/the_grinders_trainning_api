@@ -7,6 +7,7 @@ class Api::V1::TrainingBlocksController < ApplicationController
   
     # GET /api/v1/alunos/:aluno_id/training_blocks
     def index
+      @aluno = @current_user.personal.alunos.find(params[:aluno_id])
       @training_blocks = @aluno.training_blocks.order(start_date: :desc, created_at: :desc)
       render json: @training_blocks
     end
@@ -18,6 +19,7 @@ class Api::V1::TrainingBlocksController < ApplicationController
   
     # POST /api/v1/alunos/:aluno_id/training_blocks
     def create
+      @aluno = @current_user.personal.alunos.find(params[:aluno_id])
       @training_block = @aluno.training_blocks.build(training_block_params)
       @training_block.personal = @current_user.personal
   
@@ -48,12 +50,12 @@ class Api::V1::TrainingBlocksController < ApplicationController
     private
   
     def set_aluno
-      # Garante que o coach só acesse alunos que pertencem a ele
       @aluno = @current_user.personal.alunos.find(params[:aluno_id])
+    rescue ActiveRecord::RecordNotFound
+       render json: { error: 'Aluno não encontrado.' }, status: :not_found
     end
   
     def set_training_block
-      # Garante que o coach só acesse blocos de seus próprios alunos
       @training_block = TrainingBlock.joins(:aluno)
                                      .where(alunos: { personal_id: @current_user.personal.id })
                                      .find(params[:id])
@@ -62,7 +64,6 @@ class Api::V1::TrainingBlocksController < ApplicationController
     end
   
     def training_block_params
-      # O :aluno_id não é mais necessário aqui, pois pegamos da URL
       params.require(:training_block).permit(:title, :weeks_duration, :start_date, :end_date)
     end
   

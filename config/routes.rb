@@ -9,7 +9,6 @@ Rails.application.routes.draw do
       resource :profile, only: [:show, :update], controller: :profile do
         post 'change_password', on: :collection
       end
-      resources :treinos
       resources :alunos, only: [:index, :show, :create, :update, :destroy]
       resources :planos
       resources :assinaturas, only: [:index, :show, :create, :destroy]
@@ -29,6 +28,10 @@ Rails.application.routes.draw do
         resources :training_blocks, only: [:index, :create]
       end
       resources :training_blocks, only: [:show, :update, :destroy]
+      resources :weeks, only: [:show, :update] do
+        resources :treinos, only: [:index, :create]
+      end
+      resources :treinos, only: [:show, :update, :destroy]
     end
   end
 end
