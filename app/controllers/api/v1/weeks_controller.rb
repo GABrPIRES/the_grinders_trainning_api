@@ -6,7 +6,8 @@ class Api::V1::WeeksController < ApplicationController
   
     # GET /api/v1/weeks/:id
     def show
-      render json: @week, include: :treinos
+      # CORREÇÃO AQUI: Incluímos os :exercicios de cada treino
+      render json: @week, include: { treinos: { include: :exercicios } }
     end
   
     # PATCH/PUT /api/v1/weeks/:id
@@ -21,7 +22,6 @@ class Api::V1::WeeksController < ApplicationController
     private
   
     def set_week
-      # Garante que o coach só possa acessar semanas de blocos que pertencem a ele
       @week = Week.joins(training_block: :personal)
                   .where(training_blocks: { personal_id: @current_user.personal.id })
                   .find(params[:id])
