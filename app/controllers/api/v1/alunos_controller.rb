@@ -6,40 +6,28 @@ class Api::V1::AlunosController < ApplicationController
 
     # GET /api/v1/alunos
     def index
-        # --- CORREÇÃO 1: Adicionamos :pagamentos para otimização ---
-        base_scope = @current_user.personal.alunos.includes(:user, :assinaturas, :treinos, :pagamentos)
+        # CORREÇÃO: Removemos :treinos do includes
+        base_scope = @current_user.personal.alunos.includes(:user, :assinaturas, :pagamentos)
     
         if params[:search].present?
           base_scope = base_scope.where("users.name ILIKE ? OR users.email ILIKE ?", "%#{params[:search]}%", "%#{params[:search]}%")
         end
     
-        # A paginação será adicionada aqui no futuro
         @alunos = base_scope.order('users.name')
         
-        # Construímos uma resposta JSON customizada
         alunos_com_detalhes = @alunos.map do |aluno|
-          # --- CORREÇÃO 2: Buscamos o próximo pagamento em vez da assinatura ---
-          # Procura o pagamento não-pago com a data de vencimento mais próxima.
           proximo_pagamento = aluno.pagamentos.where.not(status: :pago).order(due_date: :asc).first
           assinatura_ativa = aluno.assinaturas.find(&:ativo?)
-          # Mantemos a lógica de treino
-          proximo_treino = aluno.treinos.where('day >= ?', Date.today).order(day: :asc).first
-          ultimo_treino_atualizado = aluno.treinos.order(updated_at: :desc).first
     
           aluno.as_json(include: :user).merge(
             pagamento: {
-              # --- CORREÇÃO 3: Usamos os dados do 'proximo_pagamento' ---
               vencimento: proximo_pagamento&.due_date,
               status: assinatura_ativa&.status
             },
             plano: {
-              # A busca pelo plano continua a mesma, via assinatura
               nome: aluno.assinaturas.find(&:ativo?)&.plano&.name
-            },
-            treino_info: {
-              proximo_treino: proximo_treino&.day,
-              ultima_atualizacao: ultimo_treino_atualizado&.updated_at
             }
+            # CORREÇÃO: Bloco 'treino_info' removido
           )
         end
     
@@ -49,13 +37,8 @@ class Api::V1::AlunosController < ApplicationController
   
     # GET /api/v1/alunos/:id
     def show
-        # A busca do aluno já é feita pelo before_action :set_aluno
-        
-        # Construímos a resposta JSON customizada, assim como no 'index'
         assinatura_ativa = @aluno.assinaturas.find(&:ativo?)
-        proximo_treino = @aluno.treinos.where('day >= ?', Date.today).order(day: :asc).first
         proximo_pagamento = @aluno.pagamentos.where.not(status: :pago).order(due_date: :asc).first
-        ultimo_treino_atualizado = @aluno.treinos.order(updated_at: :desc).first
     
         aluno_com_detalhes = @aluno.as_json(include: :user).merge(
           pagamento: {
@@ -64,11 +47,8 @@ class Api::V1::AlunosController < ApplicationController
           },
           plano: {
             nome: assinatura_ativa&.plano&.name
-          },
-          treino_info: {
-            proximo_treino: proximo_treino&.day,
-            ultima_atualizacao: ultimo_treino_atualizado&.updated_at
           }
+          # CORREÇÃO: Bloco 'treino_info' removido
         )
         
         render json: aluno_com_detalhes
@@ -76,6 +56,7 @@ class Api::V1::AlunosController < ApplicationController
 
     # POST /api/v1/alunos
     def create
+        # ... (O restante do seu controller, 'create', 'update', 'destroy', etc., pode continuar igual)
         all_params = params.require(:aluno).permit(
           :name, :email, :password, :password_confirmation,
           :phone_number, :plano_id # Permitimos o novo parâmetro
@@ -93,7 +74,6 @@ class Api::V1::AlunosController < ApplicationController
           @aluno = @user.create_aluno!(aluno_profile_params.merge(personal: @current_user.personal))
       
           if plano_id.present?
-            # Garante que o coach só pode usar seus próprios planos
             plano = @current_user.personal.planos.find(plano_id)
             start_date = Date.today
             end_date = start_date + plano.duration.days
@@ -129,13 +109,12 @@ class Api::V1::AlunosController < ApplicationController
           @aluno.user.update!(user_params)
           @aluno.update!(aluno_params)
     
-          # Lógica para gerenciar a assinatura
           if plano_id.present?
-            plano = @current_user.personal.planos.find(plano_id) # Garante que o plano é do coach
+            plano = @current_user.personal.planos.find(plano_id)
             assinatura = @aluno.assinaturas.ativo.first
     
             if assinatura.nil? || assinatura.plano_id.to_s != plano_id
-              assinatura&.update(status: :cancelado) # Cancela a antiga se for diferente
+              assinatura&.update(status: :cancelado)
               start_date = Date.today
               end_date = start_date + plano.duration.days
               @aluno.assinaturas.create!(plano: plano, start_date: start_date, end_date: end_date, status: :ativo)
@@ -152,8 +131,6 @@ class Api::V1::AlunosController < ApplicationController
 
     # DELETE /api/v1/alunos/:id
     def destroy
-        # Deleta o User associado, o que, por causa do 'dependent: :destroy',
-        # também deletará o perfil Aluno e todos os seus treinos, etc.
         @aluno.user.destroy
         render json: { message: 'Aluno deletado com sucesso.' }, status: :ok
     end
@@ -161,7 +138,6 @@ class Api::V1::AlunosController < ApplicationController
     private
 
     def set_aluno
-        # Garante que o coach só encontre alunos que pertencem a ele
         @aluno = @current_user.personal.alunos.find(params[:id])
     rescue ActiveRecord::RecordNotFound
         render json: { error: 'Aluno não encontrado ou não pertence a este coach' }, status: :not_found
@@ -173,12 +149,10 @@ class Api::V1::AlunosController < ApplicationController
       end
     end
 
-    # Parâmetros para CRIAR o User do aluno (senha obrigatória)
     def aluno_user_params
         params.require(:aluno).permit(:name, :email, :password, :password_confirmation)
     end
 
-    # Novo: Parâmetros para ATUALIZAR o User do aluno (senha opcional)
     def aluno_user_params_for_update
         params.require(:aluno).permit(:name, :email, :password, :password_confirmation)
     end
