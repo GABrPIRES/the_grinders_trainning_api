@@ -10,15 +10,6 @@ class Api::V1::WeeksController < ApplicationController
       render json: @week, include: { treinos: { include: :exercicios } }
     end
   
-    # PATCH/PUT /api/v1/weeks/:id
-    def update
-      if @week.update(week_params)
-        render json: @week
-      else
-        render json: @week.errors, status: :unprocessable_entity
-      end
-    end
-  
     private
   
     def set_week

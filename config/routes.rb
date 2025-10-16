@@ -28,7 +28,7 @@ Rails.application.routes.draw do
         resources :training_blocks, only: [:index, :create]
       end
       resources :training_blocks, only: [:show, :update, :destroy]
-      resources :weeks, only: [:show, :update] do
+      resources :weeks, only: [:show] do
         resources :treinos, only: [:index, :create]
       end
       resources :treinos, only: [:show, :update, :destroy]

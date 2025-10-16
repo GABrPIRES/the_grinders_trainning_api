@@ -22,18 +22,23 @@ class Api::V1::TreinosController < ApplicationController
   
     # POST /api/v1/weeks/:week_id/treinos
     def create
-      # ATUALIZAÇÃO: Cria o treino a partir da semana
-      @treino = @week.treinos.build(treino_params)
+        @treino = @week.treinos.build(treino_params)
+        @treino.personal_id = @week.training_block.personal_id
       
-      # ATUALIZAÇÃO: Associa o personal_id do bloco ao treino
-      @treino.personal_id = @week.training_block.personal_id
-
-      if @treino.save
-        render json: @treino, include: { exercicios: { include: :sections } }, status: :created
-      else
-        render json: @treino.errors, status: :unprocessable_entity
+        # NOVA VALIDAÇÃO
+        treino_day = @treino.day.to_date
+        if @week.start_date.present? && @week.end_date.present?
+          unless treino_day.between?(@week.start_date, @week.end_date)
+            return render json: { errors: ["A data do treino (#{treino_day.strftime('%d/%m/%Y')}) está fora do período da semana (#{@week.start_date.strftime('%d/%m/%Y')} - #{@week.end_date.strftime('%d/%m/%Y')})."] }, status: :unprocessable_entity
+          end
+        end
+      
+        if @treino.save
+          render json: @treino, include: { exercicios: { include: :sections } }, status: :created
+        else
+          render json: @treino.errors, status: :unprocessable_entity
+        end
       end
-    end
   
     # PATCH/PUT /api/v1/treinos/:id
     def update
