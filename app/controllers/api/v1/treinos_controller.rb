@@ -2,11 +2,8 @@
 class Api::V1::TreinosController < ApplicationController
     before_action :authenticate_request
     before_action :authorize_admin_or_coach!
-    
-    # ATUALIZAÇÃO: Carrega a semana correta para index e create
     before_action :set_week, only: [:index, :create]
-    # ATUALIZAÇÃO: Mantém o set_treino para as outras ações
-    before_action :set_treino, only: [:show, :update, :destroy]
+    before_action :set_treino, only: [:show, :update, :destroy, :duplicate]
   
     # GET /api/v1/weeks/:week_id/treinos
     def index
@@ -54,6 +51,51 @@ class Api::V1::TreinosController < ApplicationController
       @treino.destroy
       render json: { message: 'Treino deletado com sucesso' }, status: :ok
     end
+
+    # POST /api/v1/treinos/:id/duplicate
+    def duplicate
+        # O @treino (treino de origem) já é carregado pelo before_action set_treino
+        destination_week = Week.joins(training_block: :personal)
+                               .where(training_blocks: { personal_id: @current_user.personal.id })
+                               .find(duplication_params[:week_id])
+  
+        new_treino = nil # Define a variável fora da transação
+  
+        Treino.transaction do
+          # Cria o novo treino com os dados recebidos e alguns dados do original
+          new_treino = destination_week.treinos.create!(
+            name: duplication_params[:name],
+            day: duplication_params[:day],
+            personal_id: @treino.personal_id
+          )
+  
+          # Valida se a data está dentro do intervalo da semana de destino
+          new_day = new_treino.day.to_date
+          if destination_week.start_date.present? && destination_week.end_date.present?
+            unless new_day.between?(destination_week.start_date, destination_week.end_date)
+              # Se a validação falhar, reverte toda a transação
+              raise ActiveRecord::Rollback, "A data do novo treino está fora do período da semana de destino."
+            end
+          end
+  
+          # Copia cada exercício e suas respectivas seções
+          @treino.exercicios.includes(:sections).each do |source_exercicio|
+            new_exercicio = new_treino.exercicios.create!(name: source_exercicio.name)
+            source_exercicio.sections.each do |source_section|
+              new_attributes = source_section.attributes.except("id", "exercicio_id", "created_at", "updated_at")
+              new_attributes["feito"] = false # Zera o status de "feito"
+              new_exercicio.sections.create!(new_attributes)
+            end
+          end
+        end
+  
+        render json: new_treino, include: { exercicios: { include: :sections } }, status: :created
+  
+      rescue ActiveRecord::RecordNotFound
+        render json: { error: 'Treino original ou semana de destino não encontrada.' }, status: :not_found
+      rescue ActiveRecord::Rollback => e
+        render json: { errors: [e.message] }, status: :unprocessable_entity
+      end
   
     private
 
@@ -76,10 +118,8 @@ class Api::V1::TreinosController < ApplicationController
     def treino_params
       # ATUALIZAÇÃO: Removemos aluno_id, pois ele não existe mais no treino
       params.require(:treino).permit(
-        :name, 
-        :duration_time, 
+        :name,
         :day,
-        # :aluno_id, <-- REMOVIDO
         exercicios_attributes: [
           :id, 
           :name, 
@@ -97,5 +137,9 @@ class Api::V1::TreinosController < ApplicationController
           ]
         ]
       )
+    end
+
+    def duplication_params
+        params.require(:duplication).permit(:week_id, :name, :day)
     end
   end

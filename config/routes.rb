@@ -32,6 +32,11 @@ Rails.application.routes.draw do
         resources :treinos, only: [:index, :create]
       end
       resources :treinos, only: [:show, :update, :destroy]
+      resources :treinos, only: [:show, :update, :destroy] do
+        member do
+          post :duplicate
+        end
+      end
     end
   end
 end
