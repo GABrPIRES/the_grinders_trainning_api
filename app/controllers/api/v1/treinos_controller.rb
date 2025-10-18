@@ -132,7 +132,8 @@ class Api::V1::TreinosController < ApplicationController
             :equip, 
             :rpe, 
             :pr, 
-            :feito, 
+            :feito,
+            :load_unit,
             :_destroy
           ]
         ]

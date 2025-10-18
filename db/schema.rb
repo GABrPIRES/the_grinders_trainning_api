@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_10_17_010908) do
+ActiveRecord::Schema[8.0].define(version: 2025_10_18_201018) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -114,6 +114,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_17_010908) do
     t.uuid "exercicio_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "load_unit", default: "kg"
     t.index ["exercicio_id"], name: "index_sections_on_exercicio_id"
   end
 

@@ -4,6 +4,7 @@ Rails.application.routes.draw do
   # Isso gera URLs como /api/v1/recurso
   namespace :api do
     namespace :v1 do
+      get "imports/create"
       resources :users, only: [:create, :destroy, :index, :show, :update]
       post 'login', to: 'sessions#create'
       resource :profile, only: [:show, :update], controller: :profile do
@@ -37,6 +38,7 @@ Rails.application.routes.draw do
           post :duplicate
         end
       end
+      post 'import_training_block', on: :member
     end
   end
 end

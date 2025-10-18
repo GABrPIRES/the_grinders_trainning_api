@@ -29,6 +29,6 @@ class Api::V1::SectionsController < ApplicationController
   
     def section_params
       # CORREÇÃO: Adicionamos :pr aos parâmetros permitidos.
-      params.require(:section).permit(:feito, :rpe, :pr)
+      params.require(:section).permit(:feito, :rpe, :pr, :carga, :load_unit)
     end
   end
