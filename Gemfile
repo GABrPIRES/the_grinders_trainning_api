@@ -37,6 +37,8 @@ gem "rack-cors"
 
 gem 'jwt', require: true
 
+gem "roo"
+
 group :development, :test do
   # Use spring for fast test runs.
   gem "spring"

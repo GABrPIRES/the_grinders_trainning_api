@@ -27,6 +27,10 @@ Rails.application.routes.draw do
       resources :sections, only: [:update]
       resources :alunos do
         resources :training_blocks, only: [:index, :create]
+        member do
+          post 'import_training_block', to: 'imports#create'
+          post 'finalize_import', to: 'imports#finalize_import'
+        end
       end
       resources :training_blocks, only: [:show, :update, :destroy]
       resources :weeks, only: [:show] do
@@ -38,7 +42,6 @@ Rails.application.routes.draw do
           post :duplicate
         end
       end
-      post 'import_training_block', on: :member
     end
   end
 end
