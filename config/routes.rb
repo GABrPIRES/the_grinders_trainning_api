@@ -4,6 +4,7 @@ Rails.application.routes.draw do
   # Isso gera URLs como /api/v1/recurso
   namespace :api do
     namespace :v1 do
+      get "coach_dashboard/show"
       get "imports/create"
       resources :users, only: [:create, :destroy, :index, :show, :update]
       post 'login', to: 'sessions#create'
@@ -32,6 +33,7 @@ Rails.application.routes.draw do
           post 'finalize_import', to: 'imports#finalize_import'
         end
       end
+      resource :coach_dashboard, only: [:show], controller: :coach_dashboard
       resources :training_blocks, only: [:show, :update, :destroy]
       resources :weeks, only: [:show] do
         resources :treinos, only: [:index, :create]
