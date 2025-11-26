@@ -1,22 +1,31 @@
 # app/controllers/api/v1/pagamentos_controller.rb
 class Api::V1::PagamentosController < ApplicationController
     before_action :authenticate_request
-    before_action :authorize_coach!
+    before_action :authorize_coach!, except: [:index]
     before_action :set_pagamento, only: [:show, :update, :destroy]
   
     # GET /api/v1/pagamentos?aluno_id=:id
     def index
-      base_scope = Pagamento.where(aluno_id: @current_user.personal.alunos.ids)
+      if @current_user.aluno?
+        # Se for aluno, retorna APENAS os pagamentos dele
+        @pagamentos = @current_user.aluno.pagamentos.order(due_date: :desc)
+      
+      elsif @current_user.personal?
+        # Se for coach, começa com TODOS os pagamentos dele
+        scope = @current_user.personal.pagamentos
   
-      if params[:aluno_id].present?
-        @pagamentos = base_scope.where(aluno_id: params[:aluno_id]).order(due_date: :desc)
+        # CORREÇÃO: Se um aluno_id foi passado na URL, filtra por ele
+        if params[:aluno_id].present?
+          scope = scope.where(aluno_id: params[:aluno_id])
+        end
+  
+        @pagamentos = scope.order(due_date: :desc)
+      
       else
-        # Atualiza o status de todos os pagamentos pendentes antes de exibi-los
-        base_scope.where(status: :pendente).where("due_date < ?", Date.today).update_all(status: :atrasado)
-        @pagamentos = base_scope.where.not(status: :pago).order(:due_date).includes(aluno: :user)
+        return render json: { error: 'Acesso não autorizado.' }, status: :forbidden
       end
   
-      render json: @pagamentos, include: { aluno: { include: :user } }
+      render json: @pagamentos
     end
     
     # GET /api/v1/pagamentos/:id
@@ -36,30 +45,31 @@ class Api::V1::PagamentosController < ApplicationController
   
    # PATCH/PUT /api/v1/pagamentos/:id
     def update
-        # Cria uma cópia dos parâmetros para poder modificá-los
-        updated_params = pagamento_params.to_h
+      updated_params = pagamento_params.to_h
 
-        # CORREÇÃO 1: Lógica de data de pagamento
-        # Se o status está sendo mudado para 'pago', o servidor define a data atual.
-        if updated_params[:status] == 'pago'
-        updated_params[:paid_at] = Time.current
-        end
+      # CORREÇÃO: Lógica de data de pagamento
+      # Se o status é 'pago', usamos a data enviada OU a data atual como fallback.
+      if updated_params[:status] == 'pago'
+          # Se o frontend mandou paid_at, usa ele; senão, usa Time.current
+          updated_params[:paid_at] = updated_params[:paid_at].presence || Time.current
+      elsif updated_params[:status] == 'pendente'
+          # Se voltou para pendente, limpa a data
+          updated_params[:paid_at] = nil
+      end
 
-        ActiveRecord::Base.transaction do
-        @pagamento.update!(updated_params)
+      ActiveRecord::Base.transaction do
+          @pagamento.update!(updated_params)
 
-        # CORREÇÃO 2: Lógica de recorrência
-        # Verifica o parâmetro da URL como string 'true'.
-        if updated_params[:status] == 'pago' && params[:create_next] == 'true'
-            @pagamento.personal.pagamentos.create!(
-            aluno: @pagamento.aluno,
-            amount: @pagamento.amount,
-            due_date: @pagamento.due_date + 1.month,
-            status: :pendente
-            )
-        end
-        end
-        render json: @pagamento
+          if updated_params[:status] == 'pago' && params[:create_next] == 'true'
+              @pagamento.personal.pagamentos.create!(
+              aluno: @pagamento.aluno,
+              amount: @pagamento.amount,
+              due_date: @pagamento.due_date + 1.month,
+              status: :pendente
+              )
+          end
+      end
+      render json: @pagamento
     rescue ActiveRecord::RecordInvalid => e
         render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
     end
@@ -82,7 +92,7 @@ class Api::V1::PagamentosController < ApplicationController
     end
   
     def pagamento_params
-      params.require(:pagamento).permit(:aluno_id, :amount, :due_date, :status)
+      params.require(:pagamento).permit(:aluno_id, :amount, :due_date, :status, :paid_at)
     end
     
     def authorize_coach!

@@ -36,23 +36,30 @@ class Api::V1::AlunosController < ApplicationController
     
   
     # GET /api/v1/alunos/:id
+    # GET /api/v1/alunos/:id
     def show
-        assinatura_ativa = @aluno.assinaturas.find(&:ativo?)
-        proximo_pagamento = @aluno.pagamentos.where.not(status: :pago).order(due_date: :asc).first
-    
-        aluno_com_detalhes = @aluno.as_json(include: :user).merge(
-          pagamento: {
-            vencimento: proximo_pagamento&.due_date,
-            status: assinatura_ativa&.status
-          },
-          plano: {
-            nome: assinatura_ativa&.plano&.name
-          }
-          # CORREÇÃO: Bloco 'treino_info' removido
-        )
-        
-        render json: aluno_com_detalhes
+      assinatura_ativa = @aluno.assinaturas.find(&:ativo?)
+      proximo_pagamento = @aluno.pagamentos.where.not(status: :pago).order(due_date: :asc).first
+  
+      # Prepara os dados do plano (se houver assinatura ativa)
+      plano_data = nil
+      if assinatura_ativa && assinatura_ativa.plano
+        plano_data = {
+          name: assinatura_ativa.plano.name,
+          price: assinatura_ativa.plano.price
+        }
       end
+
+      aluno_com_detalhes = @aluno.as_json(include: :user).merge(
+        pagamento: {
+          vencimento: proximo_pagamento&.due_date,
+          status: assinatura_ativa&.status
+        },
+        plano: plano_data # Agora envia name e price
+      )
+      
+      render json: aluno_com_detalhes
+    end
 
     # POST /api/v1/alunos
     def create
