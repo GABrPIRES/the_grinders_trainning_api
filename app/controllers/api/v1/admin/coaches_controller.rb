@@ -5,16 +5,45 @@ class Api::V1::Admin::CoachesController < ApplicationController
   
     # GET /api/v1/admin/coaches
     def index
-      # Busca todos os perfis de Personal e já inclui os dados do User associado
-      @coaches = Personal.includes(:user).all.map do |personal|
+      # 1. Base da query com Eager Loading para evitar N+1
+      scope = Personal.includes(:user, :alunos)
+  
+      # 2. Filtro de Busca (Nome ou Email)
+      if params[:search].present?
+        term = "%#{params[:search].downcase}%"
+        scope = scope.joins(:user).where("lower(users.name) LIKE ? OR lower(users.email) LIKE ?", term, term)
+      end
+  
+      # 3. Paginação
+      page = (params[:page] || 1).to_i
+      limit = (params[:limit] || 10).to_i
+      offset = (page - 1) * limit
+  
+      # Contagem total para o frontend saber quantas páginas existem
+      total_coaches = scope.count
+      
+      # Busca os registros paginados
+      coaches = scope.order('users.created_at DESC').limit(limit).offset(offset)
+  
+      # 4. Montagem do JSON no formato que o Frontend espera
+      coaches_data = coaches.map do |coach|
         {
-          id: personal.id, # Este é o ID correto (da tabela personals)
-          user_id: personal.user.id,
-          name: personal.user.name,
-          email: personal.user.email
+          id: coach.id,
+          user_id: coach.user.id,
+          phone_number: coach.phone_number,
+          created_at: coach.created_at,
+          user: {
+            name: coach.user.name,
+            email: coach.user.email,
+            status: coach.user.status
+          },
+          # Contagem real de alunos deste coach
+          alunos_count: coach.alunos.count
         }
       end
-      render json: @coaches
+  
+      # Retorna o objeto { coaches, total }
+      render json: { coaches: coaches_data, total: total_coaches }
     end
   
     private

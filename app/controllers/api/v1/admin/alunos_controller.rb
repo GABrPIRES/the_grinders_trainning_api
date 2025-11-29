@@ -7,28 +7,52 @@ class Api::V1::Admin::AlunosController < ApplicationController
   
     # GET /api/v1/admin/alunos
     def index
-        # Define valores padrão para a paginação
-        page = params.fetch(:page, 1).to_i
-        limit = params.fetch(:limit, 10).to_i
-    
-        # Inicia a busca com o JOIN e inclui as associações para evitar N+1 queries
-        scope = Aluno.joins(:user).includes(:user)
-    
-        # Aplica os filtros
-        scope = scope.where(personal_id: params[:personal_id]) if params[:personal_id].present?
-        if params[:search].present?
-          scope = scope.where("users.name ILIKE ? OR users.email ILIKE ?", "%#{params[:search]}%", "%#{params[:search]}%")
-        end
-    
-        # Conta o total de registros ANTES de paginar
-        total = scope.count
-    
-        # Aplica a ordenação e a paginação
-        @alunos = scope.order('users.name').offset((page - 1) * limit).limit(limit)
-        
-        # Retorna os alunos e o total no mesmo JSON
-        render json: { alunos: @alunos.as_json(include: :user), total: total }
+      # 1. Busca inicial com includes essenciais para performance e dados
+      scope = Aluno.includes(:user, :personal => :user, :assinaturas => :plano, :pagamentos => [])
+
+      # 2. Filtro de Busca (Nome ou Email)
+      if params[:search].present?
+        term = "%#{params[:search].downcase}%"
+        scope = scope.joins(:user).where("lower(users.name) LIKE ? OR lower(users.email) LIKE ?", term, term)
       end
+
+      # 3. Paginação
+      page = (params[:page] || 1).to_i
+      limit = (params[:limit] || 10).to_i
+      offset = (page - 1) * limit
+
+      total_alunos = scope.count
+      alunos = scope.order(created_at: :desc).limit(limit).offset(offset)
+
+      # 4. Montagem do JSON com TODOS os dados necessários
+      alunos_data = alunos.map do |aluno|
+        assinatura_ativa = aluno.assinaturas.find(&:ativo?)
+        ultimo_pagamento = aluno.pagamentos.order(due_date: :desc).first
+
+        {
+          id: aluno.id,
+          created_at: aluno.created_at,
+          user: {
+            name: aluno.user.name,
+            email: aluno.user.email
+          },
+          personal: {
+            user: {
+              name: aluno.personal&.user&.name || "Sem Coach"
+            }
+          },
+          pagamento: {
+            status: ultimo_pagamento&.status || "pendente"
+          },
+          plano: {
+            nome: assinatura_ativa&.plano&.name || "Sem Plano"
+          }
+        }
+      end
+
+      # Retorna lista + total para paginação correta
+      render json: { alunos: alunos_data, total: total_alunos }
+    end
   
     # GET /api/v1/admin/alunos/:id
     def show
