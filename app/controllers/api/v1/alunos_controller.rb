@@ -129,40 +129,52 @@ class Api::V1::AlunosController < ApplicationController
 
   # PATCH/PUT /api/v1/alunos/:id
   def update
-      all_params = params.require(:aluno).permit(
-        :name, :email, :password, :password_confirmation, :status,
-        :phone_number, :weight, :objetivo, :plano_id
+    # 1. Adicionamos TODOS os campos novos na lista de permitidos
+    all_params = params.require(:aluno).permit(
+      :name, :email, :password, :password_confirmation, :status,
+      :phone_number, :birth_date, :weight, :height, :objetivo, 
+      :lesao, :restricao_medica, :treinos_semana, :tempo_treino, :horario_treino,
+      :pr_supino, :pr_terra, :pr_agachamento,
+      :plano_id
+    )
+
+    ActiveRecord::Base.transaction do
+      user_params = all_params.slice(:name, :email, :password, :password_confirmation, :status)
+      
+      # 2. Separamos os dados específicos da tabela 'alunos'
+      aluno_params = all_params.slice(
+          :phone_number, :birth_date, :weight, :height, :objetivo, 
+          :lesao, :restricao_medica, :treinos_semana, :tempo_treino, :horario_treino,
+          :pr_supino, :pr_terra, :pr_agachamento
       )
-  
-      ActiveRecord::Base.transaction do
-        user_params = all_params.slice(:name, :email, :password, :password_confirmation, :status)
-        aluno_params = all_params.slice(:phone_number, :weight, :objetivo)
-        plano_id = all_params[:plano_id]
-  
-        user_params.delete_if { |k, v| k.include?('password') && v.blank? }
-  
-        @aluno.user.update!(user_params)
-        @aluno.update!(aluno_params)
-  
-        if plano_id.present?
-          plano = @current_user.personal.planos.find(plano_id)
-          assinatura = @aluno.assinaturas.ativo.first
-  
-          if assinatura.nil? || assinatura.plano_id.to_s != plano_id
-            assinatura&.update(status: :cancelado)
-            start_date = Date.today
-            end_date = start_date + plano.duration.days
-            @aluno.assinaturas.create!(plano: plano, start_date: start_date, end_date: end_date, status: :ativo)
-          end
-        else
-          @aluno.assinaturas.ativo.update_all(status: :cancelado)
+      plano_id = all_params[:plano_id]
+
+      user_params.delete_if { |k, v| k.include?('password') && v.blank? }
+
+      @aluno.user.update!(user_params)
+      @aluno.update!(aluno_params) # Aqui ele salva os dados de saúde/treino
+
+      # ... (lógica do plano continua igual) ...
+      if plano_id.present?
+        plano = @current_user.personal.planos.find(plano_id)
+        assinatura = @aluno.assinaturas.ativo.first
+
+        if assinatura.nil? || assinatura.plano_id.to_s != plano_id
+          assinatura&.update(status: :cancelado)
+          start_date = Date.today
+          end_date = start_date + plano.duration.days
+          @aluno.assinaturas.create!(plano: plano, start_date: start_date, end_date: end_date, status: :ativo)
         end
+      elsif params[:aluno].key?(:plano_id) && plano_id.blank?
+         # Se enviou plano_id vazio, cancela assinatura (opcional, dependendo da sua regra)
+         # @aluno.assinaturas.ativo.update_all(status: :cancelado)
       end
-  
-      render json: @aluno, include: :user
-    rescue ActiveRecord::RecordInvalid => e
-      render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
     end
+
+    render json: @aluno, include: :user
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
 
   # DELETE /api/v1/alunos/:id
   def destroy
