@@ -56,8 +56,19 @@ class Api::V1::Admin::AlunosController < ApplicationController
   
     # GET /api/v1/admin/alunos/:id
     def show
-        render json: @aluno, include: [:user, :assinaturas]
-    end
+      # Retorna uma estrutura plana para facilitar o formulário
+      render json: {
+          id: @aluno.id,
+          user_id: @aluno.user.id,
+          name: @aluno.user.name,
+          email: @aluno.user.email,
+          status: @aluno.user.status,
+          phone_number: @aluno.phone_number,
+          personal_id: @aluno.personal_id,
+          # Pega o plano ativo, se houver
+          plano_id: @aluno.assinaturas.find(&:ativo?)&.plano_id 
+      }
+  end
   
     # POST /api/v1/admin/alunos
     def create
@@ -99,41 +110,41 @@ class Api::V1::Admin::AlunosController < ApplicationController
   
     # PATCH/PUT /api/v1/admin/alunos/:id
     def update
-        # Permite todos os parâmetros de uma vez
-        all_params = params.require(:aluno).permit(
-          :name, :email, :password, :password_confirmation, :status, # Adiciona status
-          :phone_number, :personal_id, :plano_id # Adiciona plano_id
-        )
-    
-        ActiveRecord::Base.transaction do
-          user_params = all_params.slice(:name, :email, :password, :password_confirmation, :status)
-          aluno_params = all_params.slice(:phone_number, :personal_id)
-          plano_id = all_params[:plano_id]
-    
-          # Remove a senha se estiver em branco
-          user_params.delete_if { |k, v| k.include?('password') && v.blank? }
-    
-          @aluno.user.update!(user_params)
-          @aluno.update!(aluno_params)
-    
-          # Lógica para gerenciar a assinatura
-          if plano_id.present?
-            plano = Plano.find(plano_id)
-            assinatura = @aluno.assinaturas.order(created_at: :desc).first
-    
-            # Se não há assinatura ou a assinatura atual é para um plano diferente
-            if assinatura.nil? || assinatura.plano_id.to_s != plano_id
-              start_date = Date.today
-              end_date = start_date + plano.duration.days
-              @aluno.assinaturas.create!(plano: plano, start_date: start_date, end_date: end_date, status: :ativo)
-            end
-          else
-            # Se "Nenhum plano" for selecionado, cancela a assinatura ativa
-            @aluno.assinaturas.ativo.update_all(status: :cancelado)
+      # O parâmetro :id aqui pode ser o user_id (se vier do frontend novo)
+      # Vamos garantir que @aluno esteja setado corretamente
+      
+      # (Mantive a lógica de strong params igual à sua)
+      all_params = params.require(:aluno).permit(
+        :name, :email, :password, :password_confirmation, :status, 
+        :phone_number, :personal_id, :plano_id 
+      )
+
+      ActiveRecord::Base.transaction do
+        user_params = all_params.slice(:name, :email, :password, :password_confirmation, :status)
+        aluno_params = all_params.slice(:phone_number, :personal_id)
+        plano_id = all_params[:plano_id]
+
+        user_params.delete_if { |k, v| k.include?('password') && v.blank? }
+
+        @aluno.user.update!(user_params)
+        @aluno.update!(aluno_params)
+
+        # Lógica de assinatura
+        if plano_id.present?
+          plano = Plano.find(plano_id)
+          assinatura = @aluno.assinaturas.order(created_at: :desc).first
+
+          if assinatura.nil? || assinatura.plano_id.to_s != plano_id
+            start_date = Date.today
+            end_date = start_date + plano.duration.days
+            @aluno.assinaturas.create!(plano: plano, start_date: start_date, end_date: end_date, status: :ativo)
           end
+        else
+          @aluno.assinaturas.ativo.update_all(status: :cancelado)
         end
-    
-        render json: @aluno, include: :user
+      end
+
+      render json: @aluno, include: :user
     rescue ActiveRecord::RecordInvalid => e
         render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
     end
@@ -148,9 +159,15 @@ class Api::V1::Admin::AlunosController < ApplicationController
   
     # CORREÇÃO: Lógica de busca correta para o admin.
     def set_aluno
-      @aluno = Aluno.find(params[:id])
-    rescue ActiveRecord::RecordNotFound
-      render json: { error: 'Aluno não encontrado' }, status: :not_found
+      # Tenta buscar pelo ID direto na tabela Alunos
+      @aluno = Aluno.find_by(id: params[:id])
+      
+      # Se não achar, tenta buscar pelo user_id (caso o frontend tenha mandado o ID do usuário)
+      @aluno ||= Aluno.find_by(user_id: params[:id])
+
+      if @aluno.nil?
+         render json: { error: 'Aluno não encontrado' }, status: :not_found
+      end
     end
   
     def check_if_admin
