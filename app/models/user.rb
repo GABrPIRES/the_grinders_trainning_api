@@ -10,4 +10,8 @@ class User < ApplicationRecord
   
     has_one :personal, dependent: :destroy
     has_one :aluno, dependent: :destroy
+
+    def as_json(options = {})
+      super(options.merge(except: [:password_digest]))
+    end
   end

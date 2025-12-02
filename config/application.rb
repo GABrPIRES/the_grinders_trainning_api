@@ -1,6 +1,7 @@
 require_relative "boot"
 
 require "rails/all"
+require "rack/attack"
 
 # Require the gems listed in Gemfile, including any gems
 # you've limited to :test, :development, or :production.
@@ -30,5 +31,13 @@ module TheGrindersApi
     # Middleware like session, flash, cookies can be added back manually.
     # Skip views, helpers and assets when generating a new resource.
     config.api_only = true
+
+    # [FIX] Adiciona suporte a Cookies e Sessão para API-Only
+    # Necessário para autenticação segura via HttpOnly Cookies
+    config.middleware.use ActionDispatch::Cookies
+    config.middleware.use ActionDispatch::Session::CookieStore, key: '_the_grinders_api_session'
+    
+    # Ativa o Rack Attack (já adicionamos antes, mantendo aqui)
+    config.middleware.use Rack::Attack
   end
 end
