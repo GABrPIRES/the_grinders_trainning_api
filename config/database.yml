@@ -87,6 +87,7 @@ production:
     database: the_grinders_api_production
     username: postgres
     password: <%= ENV["THE_GRINDERS_API_DATABASE_PASSWORD"] %>
+    host: <%= ENV.fetch("DB_HOST", "the-grinders-api-db") %>
   cache:
     <<: *primary_production
     database: the_grinders_api_production_cache

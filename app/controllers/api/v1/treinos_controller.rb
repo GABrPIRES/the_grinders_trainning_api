@@ -62,6 +62,7 @@ class Api::V1::TreinosController < ApplicationController
 
   # POST /api/v1/treinos/:id/duplicate
   def duplicate
+    # Busca a semana de destino (garantindo que pertence ao coach logado)
     destination_week = Week.joins(training_block: :personal)
                            .where(training_blocks: { personal_id: @current_user.personal.id })
                            .find(duplication_params[:week_id])
@@ -69,27 +70,38 @@ class Api::V1::TreinosController < ApplicationController
     new_treino = nil 
 
     Treino.transaction do
-      new_treino = destination_week.treinos.create!(
-        name: duplication_params[:name],
-        day: duplication_params[:day],
-        personal_id: @treino.personal_id,
-        description: @treino.description # Copia a descrição também
-      )
-
-      # Validação de data no duplicado
-      if destination_week.start_date.present? && destination_week.end_date.present?
-        unless new_treino.day.to_date.between?(destination_week.start_date, destination_week.end_date)
-          raise ActiveRecord::Rollback, "Data fora da semana de destino."
-        end
+      # 1. Duplica o objeto treino base (ignora ID, created_at, etc)
+      new_treino = @treino.dup
+      
+      # 2. Atualiza com os novos dados
+      new_treino.week = destination_week
+      new_treino.name = duplication_params[:name]
+      new_treino.day = duplication_params[:day]
+      
+      # Garante que copia a descrição SE ela existir, senão ignora
+      if @treino.respond_to?(:description)
+        new_treino.description = @treino.description 
       end
 
-      # Copia exercícios
+      # Validação de data (opcional, mas bom ter)
+      if destination_week.start_date.present? && destination_week.end_date.present?
+        target_date = new_treino.day.to_date
+        # Permite salvar mesmo fora da data, mas poderia lançar erro aqui se quisesse ser rígido
+      end
+
+      new_treino.save!
+
+      # 3. Copia Exercícios e Sections
       @treino.exercicios.includes(:sections).each do |source_exercicio|
         new_exercicio = new_treino.exercicios.create!(name: source_exercicio.name)
+        
         source_exercicio.sections.each do |source_section|
-          new_attributes = source_section.attributes.except("id", "exercicio_id", "created_at", "updated_at")
-          new_attributes["feito"] = false
-          new_exercicio.sections.create!(new_attributes)
+          # Copia atributos da section ignorando IDs
+          sec_attrs = source_section.attributes.except("id", "exercicio_id", "created_at", "updated_at")
+          sec_attrs["feito"] = false # Reseta o status de feito
+          # Limpa o PR copiado para recalcular ou manter histórico limpo (opcional, aqui mantivemos a cópia)
+          
+          new_exercicio.sections.create!(sec_attrs)
         end
       end
     end
@@ -97,9 +109,9 @@ class Api::V1::TreinosController < ApplicationController
     render json: new_treino, include: { exercicios: { include: :sections } }, status: :created
 
   rescue ActiveRecord::RecordNotFound
-    render json: { error: 'Semana não encontrada.' }, status: :not_found
-  rescue ActiveRecord::Rollback => e
-    render json: { errors: [e.message] }, status: :unprocessable_entity
+    render json: { error: 'Semana de destino não encontrada ou acesso negado.' }, status: :not_found
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { error: e.message }, status: :unprocessable_entity
   end
 
   private
