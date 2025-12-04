@@ -32,10 +32,10 @@ env:
     - KAMAL_REGISTRY_PASSWORD
     - SECRET_KEY_BASE
   clear:
-    DB_HOST: the-grinders-api-db
+    DB_HOST: 68.183.151.132
     SOLID_QUEUE_IN_PUMA: true
     RAILS_LOG_LEVEL: "info"
-    FRONTEND_URL: "https://thegrinderspowerlifting.com.br"
+    FRONTEND_URL: "https://www.thegrinderspowerlifting.com.br"
 
 accessories:
   db:
