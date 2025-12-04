@@ -2,6 +2,7 @@
 Rails.application.routes.draw do
   # Define um namespace para a API, versionando as rotas.
   # Isso gera URLs como /api/v1/recurso
+  get "up" => "rails/health#show", as: :rails_health_check
   namespace :api do
     namespace :v1 do
       get "student_dashboard/show"
