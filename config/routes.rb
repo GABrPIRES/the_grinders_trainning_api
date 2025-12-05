@@ -11,6 +11,7 @@ Rails.application.routes.draw do
       resources :users, only: [:create, :destroy, :index, :show, :update]
       post 'login', to: 'sessions#create'
       delete 'logout', to: 'sessions#destroy'
+      post 'auth/change_password', to: 'profile#change_password'
       resource :profile, only: [:show, :update], controller: :profile do
         post 'change_password', on: :collection
       end
