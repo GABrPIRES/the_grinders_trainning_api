@@ -38,20 +38,18 @@ class Api::V1::TrainingBlocksController < ApplicationController
 
   # PATCH/PUT /api/v1/training_blocks/:id
   def update
-    # Atribui os novos parâmetros ao bloco, mas ainda não salva
+    # Atribui os novos parâmetros
     @training_block.assign_attributes(training_block_params)
 
-    # CORREÇÃO: Verificamos se a data de início MUDOU, antes de salvar
-    start_date_has_changed = @training_block.start_date_changed?
-
+    # Verifica se houve mudança na duração ou na data de início
+    # (Ou simplesmente forçamos o recálculo sempre, que é mais seguro)
+    
     if @training_block.save
-      # A lógica de atualizar a duração das semanas continua a mesma
+      # 1. Cria ou remove semanas conforme a nova duração
       update_weeks_for_block(@training_block)
       
-      # Agora, usamos a nossa variável para decidir se recalculamos as datas
-      if start_date_has_changed
-        calculate_and_save_week_dates(@training_block)
-      end
+      # 2. [CORREÇÃO] Recalcula as datas de TODAS as semanas (garante que as novas tenham data)
+      calculate_and_save_week_dates(@training_block)
       
       render json: @training_block
     else
