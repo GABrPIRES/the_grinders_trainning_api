@@ -81,6 +81,8 @@ class Api::V1::AlunosController < ApplicationController
         status: assinatura_ativa&.status
       },
       plano: plano_data,
+      # [NOVO] Enviamos o ID para o frontend poder preencher o select de edição
+      current_plano_id: assinatura_ativa&.plano_id,
       treino_info: {
         proximo_treino: proximo_treino&.day,
         ultima_atualizacao: ultimo_treino_atualizado&.updated_at
