@@ -46,7 +46,6 @@ class Api::V1::WeeksController < ApplicationController
         new_treino = target_week.treinos.create!(
           name: source_treino.name,
           day: new_date,
-          description: source_treino.description,
           personal_id: @current_user.personal.id # Se sua tabela ainda usa isso
         )
 
