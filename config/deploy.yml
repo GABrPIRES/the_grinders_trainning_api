@@ -21,9 +21,9 @@ registry:
 
 # SEU TRUNFO: Usar o servidor para compilar (evita erro de memória no Mac e arquitetura)
 builder:
-  arch: amd64
   remote: ssh://root@68.183.151.132
-
+  arch: amd64
+  
 env:
   secret:
     - RAILS_MASTER_KEY
