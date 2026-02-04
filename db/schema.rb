@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_10_18_201018) do
+ActiveRecord::Schema[8.0].define(version: 2026_02_01_220020) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -89,6 +89,10 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_18_201018) do
     t.string "instagram"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "signup_code"
+    t.datetime "signup_code_expires_at"
+    t.boolean "auto_approve_students", default: false
+    t.index ["signup_code"], name: "index_personals_on_signup_code", unique: true
     t.index ["user_id"], name: "index_personals_on_user_id"
   end
 
@@ -150,7 +154,10 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_18_201018) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.integer "status", default: 0, null: false
+    t.string "verification_token"
+    t.datetime "email_verified_at"
     t.index ["email"], name: "index_users_on_email", unique: true
+    t.index ["verification_token"], name: "index_users_on_verification_token", unique: true
   end
 
   create_table "weeks", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|

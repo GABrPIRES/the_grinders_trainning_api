@@ -5,6 +5,15 @@ Rails.application.routes.draw do
   get "up" => "rails/health#show", as: :rails_health_check
   namespace :api do
     namespace :v1 do
+      namespace :auth do
+        post 'signup', to: 'registrations#create'
+        post 'verify_email', to: 'verifications#verify'
+      end
+      namespace :coach do
+        resource :invite, only: [:show], controller: 'invites'
+        put 'settings', to: 'invites#update' # <--- Add this line
+        resources :approvals, only: [:index, :update]
+      end
       get "student_dashboard/show"
       get "coach_dashboard/show"
       get "imports/create"

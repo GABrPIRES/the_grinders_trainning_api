@@ -3,8 +3,15 @@ class Api::V1::SessionsController < ApplicationController
   def create
     user = User.find_by(email: params[:email])
 
-    if user&.inativo?
-      return render json: { error: 'Sua conta está desativada.' }, status: :unauthorized
+    if user && !user.ativo?
+      message = case user.status
+                when 'pending' then 'Sua conta aguarda aprovação do coach.'
+                when 'unverified' then 'Verifique seu e-mail antes de entrar.'
+                when 'rejected' then 'Sua solicitação de cadastro foi recusada.'
+                else 'Sua conta está desativada.'
+                end
+      
+      return render json: { error: message }, status: :unauthorized
     end
 
     if user&.authenticate(params[:password])
