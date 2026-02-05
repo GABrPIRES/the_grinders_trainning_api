@@ -55,7 +55,20 @@ Rails.application.configure do
   # config.action_mailer.raise_delivery_errors = false
 
   # Set host to be used by links generated in mailer templates.
-  config.action_mailer.default_url_options = { host: "example.com" }
+  # Configuração do Resend para Produção
+  config.action_mailer.delivery_method = :resend
+  config.action_mailer.resend_settings = {
+    api_key: ENV['RESEND_API_KEY']
+  }
+  
+  # Garanta que erros de envio apareçam no log
+  config.action_mailer.raise_delivery_errors = true
+  
+  # URL do host para links de e-mail (Reset de senha, Verificação, etc)
+  # Se já tiver 'default_url_options', apenas ajuste o host.
+  config.action_mailer.default_url_options = { host: 'api.thegrinderspowerlifting.com.br' } 
+  # Ou se usar a API apenas como backend, pode ser o host do front:
+  # config.action_mailer.default_url_options = { host: 'app.thegrinders.com.br' }
 
   # Specify outgoing SMTP server. Remember to add smtp/* credentials via rails credentials:edit.
   # config.action_mailer.smtp_settings = {
