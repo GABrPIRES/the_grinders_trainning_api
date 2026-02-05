@@ -48,5 +48,7 @@ accessories:
         POSTGRES_DB: the_grinders_api_production
       secret:
         - POSTGRES_PASSWORD
+        - RESEND_API_KEY
+        - FRONTEND_URL
     directories:
       - data:/var/lib/postgresql/data
