@@ -22,7 +22,7 @@ class AuthMailer < ApplicationMailer
   
       # Destinatário
       destinatario = Rails.env.development? ? "gabriellaeon@gmail.com" : @user.email
-  
+      
       mail(
         to: destinatario,
         subject: 'Bem-vindo ao The Grinders!'
