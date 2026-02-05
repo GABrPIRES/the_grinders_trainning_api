@@ -12,20 +12,20 @@ class AuthMailer < ApplicationMailer
       
       # Exemplo: Vamos tentar pegar do localhost por enquanto para você ver no Preview
       # Certifique-se de ter a imagem em public/images/logo-email.png
-      host = Rails.env.production? ? "https://api.thegrinders.com.br" : "http://localhost:3000"
-      
+      api_host = Rails.env.production? ? "https://api.thegrinderspowerlifting.com.br" : "http://localhost:3000"
+
       # Ajuste o nome do arquivo aqui para o nome exato da sua imagem na pasta public/images/
       image_name_1 = "logo_the_grinders_dark-removebg-preview.png"
       image_name_2 = "logo-the-grinders-2.png"
       # ou o nome que você tiver lá
-      @logo_url = "#{host}/images/#{image_name_1}"
+      @logo_url = "#{api_host}/images/#{image_name_1}"
   
       # Destinatário
       destinatario = Rails.env.development? ? "gabriellaeon@gmail.com" : @user.email
-      
+
       mail(
         to: destinatario,
-        subject: 'Bem-vindo ao The Grinders!'
+        subject: 'Bem-vindo ao The Grinders Team! Verifique seu e-mail para acessar o app.'
       )
     end
   end
