@@ -24,7 +24,7 @@ class Api::V1::SessionsController < ApplicationController
         httponly: true,
         secure: Rails.env.production?, # HTTPS apenas em produção
         same_site: :lax,
-        expires: 24.hours.from_now
+        expires: 30.days.from_now
       }
 
       # [CORREÇÃO] Só define domain: :all se estiver em produção.
