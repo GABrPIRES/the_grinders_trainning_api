@@ -16,6 +16,7 @@ class User < ApplicationRecord
   
     has_one :personal, dependent: :destroy
     has_one :aluno, dependent: :destroy
+    has_many :notifications, dependent: :destroy
 
     before_create :generate_verification_token, if: -> { unverified? && aluno? }
 
