@@ -2,8 +2,8 @@
 class Api::V1::TrainingBlocksController < ApplicationController
   before_action :authenticate_request
   before_action :authorize_coach!
-  before_action :set_aluno, only: [:index, :create]
-  before_action :set_training_block, only: [:show, :update, :destroy]
+  before_action :set_aluno, only: [ :index, :create ]
+  before_action :set_training_block, only: [ :show, :update, :destroy ]
 
   # ... (actions index, show, destroy permanecem iguais) ...
   def index
@@ -13,12 +13,21 @@ class Api::V1::TrainingBlocksController < ApplicationController
   end
 
   def show
-    render json: @training_block, include: { weeks: { include: :treinos } }
+    weeks_data = @training_block.weeks.order(week_number: :asc).map do |week|
+      treinos_data = week.treinos.order(:day).map do |treino|
+        treino.as_json.merge(
+          has_pending_ai_suggestions: AiLoadSuggestion.for_treino(treino.id).pending.exists?,
+          has_ai_observation: treino.ai_observation.present?
+        )
+      end
+      week.as_json.merge(treinos: treinos_data, feedback_enabled: week.feedback_enabled)
+    end
+    render json: @training_block.as_json.merge(weeks: weeks_data)
   end
 
   def destroy
     @training_block.destroy
-    render json: { message: 'Bloco de treino deletado com sucesso.' }, status: :ok
+    render json: { message: "Bloco de treino deletado com sucesso." }, status: :ok
   end
 
 
@@ -43,14 +52,14 @@ class Api::V1::TrainingBlocksController < ApplicationController
 
     # Verifica se houve mudança na duração ou na data de início
     # (Ou simplesmente forçamos o recálculo sempre, que é mais seguro)
-    
+
     if @training_block.save
       # 1. Cria ou remove semanas conforme a nova duração
       update_weeks_for_block(@training_block)
-      
+
       # 2. [CORREÇÃO] Recalcula as datas de TODAS as semanas (garante que as novas tenham data)
       calculate_and_save_week_dates(@training_block)
-      
+
       render json: @training_block
     else
       render json: @training_block.errors, status: :unprocessable_entity
@@ -63,7 +72,7 @@ class Api::V1::TrainingBlocksController < ApplicationController
   def set_aluno
     @aluno = @current_user.personal.alunos.find(params[:aluno_id])
   rescue ActiveRecord::RecordNotFound
-     render json: { error: 'Aluno não encontrado.' }, status: :not_found
+     render json: { error: "Aluno não encontrado." }, status: :not_found
   end
 
   def set_training_block
@@ -71,7 +80,7 @@ class Api::V1::TrainingBlocksController < ApplicationController
                                    .where(alunos: { personal_id: @current_user.personal.id })
                                    .find(params[:id])
   rescue ActiveRecord::RecordNotFound
-    render json: { error: 'Bloco de treino não encontrado ou não pertence a um de seus alunos.' }, status: :not_found
+    render json: { error: "Bloco de treino não encontrado ou não pertence a um de seus alunos." }, status: :not_found
   end
 
   def training_block_params
@@ -108,7 +117,7 @@ class Api::V1::TrainingBlocksController < ApplicationController
 
     weeks.each_with_index do |week, index|
       current_week_start_date = next_week_start_date
-      
+
       # Lógica para calcular o fim da semana (domingo)
       # wday: 0=Dom, 1=Seg, ..., 6=Sáb
       days_until_sunday = (7 - current_week_start_date.wday) % 7
@@ -125,7 +134,7 @@ class Api::V1::TrainingBlocksController < ApplicationController
       end
 
       week.update_columns(start_date: current_week_start_date, end_date: week_end_date)
-      
+
       # Prepara a data de início para a PRÓXIMA iteração (sempre o dia seguinte ao fim da semana atual)
       next_week_start_date = week_end_date + 1.day
     end
@@ -133,6 +142,6 @@ class Api::V1::TrainingBlocksController < ApplicationController
 
   def authorize_coach!
     return if @current_user.personal?
-    render json: { error: 'Acesso restrito a coaches.' }, status: :forbidden
+    render json: { error: "Acesso restrito a coaches." }, status: :forbidden
   end
 end

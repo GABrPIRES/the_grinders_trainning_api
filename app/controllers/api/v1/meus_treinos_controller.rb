@@ -9,12 +9,12 @@ class Api::V1::MeusTreinosController < ApplicationController
     # Busca os blocos ordenados pelo mais recente (o atual)
     @training_blocks = @aluno_profile.training_blocks
                                      .order(start_date: :desc, created_at: :desc)
-    
+
     # Inclui as semanas e os treinos (sem os exercícios para ficar leve)
-    render json: @training_blocks, include: { 
-      weeks: { 
-        include: :treinos 
-      } 
+    render json: @training_blocks, include: {
+      weeks: {
+        include: :treinos
+      }
     }
   end
 
@@ -26,9 +26,11 @@ class Api::V1::MeusTreinosController < ApplicationController
                     .where(alunos: { id: @aluno_profile.id })
                     .find(params[:id])
 
-    render json: @treino, include: { exercicios: { include: :sections } }
+    feedback_submitted = WeeklyFeedback.exists?(week: @treino.week, aluno: @aluno_profile)
+    render json: @treino.as_json(include: { exercicios: { include: :sections } })
+                        .merge(feedback_submitted: feedback_submitted)
   rescue ActiveRecord::RecordNotFound
-    render json: { error: 'Treino não encontrado ou não pertence a este aluno.' }, status: :not_found
+    render json: { error: "Treino não encontrado ou não pertence a este aluno." }, status: :not_found
   end
 
   private
@@ -36,7 +38,7 @@ class Api::V1::MeusTreinosController < ApplicationController
   def set_aluno_profile
     @aluno_profile = @current_user.aluno
     if @aluno_profile.nil?
-      render json: { error: 'Perfil de aluno não encontrado para este usuário.' }, status: :not_found
+      render json: { error: "Perfil de aluno não encontrado para este usuário." }, status: :not_found
     end
   end
 end
