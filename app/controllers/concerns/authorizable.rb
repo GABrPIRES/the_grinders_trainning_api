@@ -21,4 +21,10 @@ module Authorizable
       return if @current_user.admin? || @current_user.personal?
       render json: { error: 'Acesso restrito a administradores ou coaches.' }, status: :forbidden
     end
+
+    # Apenas Alunos podem passar
+    def authorize_aluno!
+      return if @current_user.aluno?
+      render json: { error: 'Acesso restrito a alunos.' }, status: :forbidden
+    end
   end

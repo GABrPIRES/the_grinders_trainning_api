@@ -1,11 +1,39 @@
 class Api::V1::WeeksController < ApplicationController
   before_action :authenticate_request
   before_action :authorize_coach!
-  before_action :set_week, only: [:show, :duplicate]
+  before_action :set_week, only: [ :show, :update, :duplicate, :toggle_feedback ]
+
+  # POST /api/v1/training_blocks/:training_block_id/weeks
+  def create
+    block = TrainingBlock.joins(:personal)
+                         .where(personals: { id: @current_user.personal.id })
+                         .find(params[:training_block_id])
+
+    last_number = block.weeks.maximum(:week_number) || 0
+    last_end_date = block.weeks.order(:week_number).last&.end_date
+
+    week = block.weeks.create!(
+      week_number: last_number + 1,
+      start_date: last_end_date ? last_end_date + 1 : nil,
+      end_date: last_end_date ? last_end_date + 7 : nil
+    )
+
+    render json: week, status: :created
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: "Bloco não encontrado." }, status: :not_found
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
 
   # GET /api/v1/weeks/:id
   def show
-    render json: @week, include: { treinos: { include: :exercicios } }
+    treinos_data = @week.treinos.order(:day).map do |treino|
+      treino.as_json.merge(
+        has_pending_ai_suggestions: AiLoadSuggestion.for_treino(treino.id).pending.exists?,
+        has_ai_observation: treino.ai_observation.present?
+      )
+    end
+    render json: @week.as_json.merge(treinos: treinos_data, feedback_enabled: @week.feedback_enabled)
   end
 
   # POST /api/v1/weeks/:id/duplicate
@@ -14,7 +42,7 @@ class Api::V1::WeeksController < ApplicationController
     target_week_id = params[:target_week_id]
 
     if target_week_id.blank?
-      return render json: { error: 'ID da semana de destino é obrigatório.' }, status: :unprocessable_entity
+      return render json: { error: "ID da semana de destino é obrigatório." }, status: :unprocessable_entity
     end
 
     # Busca a semana de destino garantindo que pertence a um aluno deste coach (segurança)
@@ -24,7 +52,7 @@ class Api::V1::WeeksController < ApplicationController
                       .find_by(id: target_week_id)
 
     if target_week.nil?
-      return render json: { error: 'Semana de destino não encontrada ou sem permissão.' }, status: :not_found
+      return render json: { error: "Semana de destino não encontrada ou sem permissão." }, status: :not_found
     end
 
     ActiveRecord::Base.transaction do
@@ -33,12 +61,12 @@ class Api::V1::WeeksController < ApplicationController
       # Se a semana destino não tiver data definida, usamos hoje como base.
       base_date_source = @week.start_date || Date.today
       base_date_target = target_week.start_date || Date.today
-      
+
       # Itera sobre os treinos da semana original
       @week.treinos.includes(exercicios: :sections).each do |source_treino|
         # Calcula quantos dias após o início da semana o treino original ocorreu
         days_diff = (source_treino.day.to_date - base_date_source).to_i
-        
+
         # Aplica esse deslocamento na semana de destino
         new_date = base_date_target + days_diff.days
 
@@ -69,24 +97,50 @@ class Api::V1::WeeksController < ApplicationController
       end
     end
 
-    render json: { message: 'Semana duplicada com sucesso!', target_week_id: target_week.id }, status: :ok
+    render json: { message: "Semana duplicada com sucesso!", target_week_id: target_week.id }, status: :ok
 
   rescue ActiveRecord::RecordInvalid => e
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end
 
+  # PATCH /api/v1/weeks/:id
+  # Coach define o objetivo de periodização da semana.
+  def update
+    if @week.update(week_update_params)
+      render json: {
+        periodization_goal: @week.periodization_goal,
+        week_number: @week.week_number,
+        start_date: @week.start_date,
+        end_date: @week.end_date
+      }
+    else
+      render json: @week.errors, status: :unprocessable_entity
+    end
+  end
+
+  # PATCH /api/v1/weeks/:id/toggle_feedback
+  # Coach ativa ou desativa o formulário semanal para esta semana.
+  def toggle_feedback
+    @week.update!(feedback_enabled: !@week.feedback_enabled)
+    render json: { feedback_enabled: @week.feedback_enabled }
+  end
+
   private
+
+  def week_update_params
+    params.require(:week).permit(:periodization_goal, :week_number, :start_date, :end_date)
+  end
 
   def set_week
     @week = Week.joins(training_block: :personal)
                 .where(training_blocks: { personal_id: @current_user.personal.id })
                 .find(params[:id])
   rescue ActiveRecord::RecordNotFound
-    render json: { error: 'Semana não encontrada.' }, status: :not_found
+    render json: { error: "Semana não encontrada." }, status: :not_found
   end
 
   def authorize_coach!
     return if @current_user.personal?
-    render json: { error: 'Acesso restrito a coaches.' }, status: :forbidden
+    render json: { error: "Acesso restrito a coaches." }, status: :forbidden
   end
 end

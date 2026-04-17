@@ -10,10 +10,21 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_02_01_220020) do
+ActiveRecord::Schema[8.0].define(version: 2026_04_11_000009) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
+
+  create_table "ai_load_suggestions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "section_id", null: false
+    t.float "suggested_load", null: false
+    t.integer "status", default: 0, null: false
+    t.boolean "critical", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["section_id"], name: "index_ai_load_suggestions_on_section_id"
+    t.index ["status"], name: "index_ai_load_suggestions_on_status"
+  end
 
   create_table "alunos", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "user_id", null: false
@@ -57,7 +68,20 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_01_220020) do
     t.uuid "treino_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.text "observation"
     t.index ["treino_id"], name: "index_exercicios_on_treino_id"
+  end
+
+  create_table "notifications", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "user_id", null: false
+    t.integer "notification_type", null: false
+    t.jsonb "payload", default: {}, null: false
+    t.datetime "read_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["notification_type"], name: "index_notifications_on_notification_type"
+    t.index ["user_id", "read_at"], name: "index_notifications_on_user_id_and_read_at"
+    t.index ["user_id"], name: "index_notifications_on_user_id"
   end
 
   create_table "pagamentos", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -119,6 +143,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_01_220020) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "load_unit", default: "kg"
+    t.float "actual_load"
+    t.float "actual_rpe"
     t.index ["exercicio_id"], name: "index_sections_on_exercicio_id"
   end
 
@@ -142,7 +168,12 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_01_220020) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.uuid "week_id"
+    t.integer "status", default: 1, null: false
+    t.datetime "started_at"
+    t.datetime "finished_at"
+    t.text "ai_observation"
     t.index ["personal_id"], name: "index_treinos_on_personal_id"
+    t.index ["status"], name: "index_treinos_on_status"
     t.index ["week_id"], name: "index_treinos_on_week_id"
   end
 
@@ -160,6 +191,22 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_01_220020) do
     t.index ["verification_token"], name: "index_users_on_verification_token", unique: true
   end
 
+  create_table "weekly_feedbacks", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "week_id", null: false
+    t.uuid "aluno_id", null: false
+    t.integer "sleep_level"
+    t.integer "stress_level"
+    t.integer "diet_level"
+    t.float "body_weight"
+    t.integer "training_desire"
+    t.text "general_evaluation"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["aluno_id"], name: "index_weekly_feedbacks_on_aluno_id"
+    t.index ["week_id", "aluno_id"], name: "index_weekly_feedbacks_on_week_id_and_aluno_id", unique: true
+    t.index ["week_id"], name: "index_weekly_feedbacks_on_week_id"
+  end
+
   create_table "weeks", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.integer "week_number"
     t.uuid "training_block_id", null: false
@@ -167,14 +214,21 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_01_220020) do
     t.date "end_date"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "periodization_goal", default: 1, null: false
+    t.datetime "snoozed_at"
+    t.datetime "coach_alerted_at"
+    t.boolean "feedback_enabled", default: true, null: false
+    t.index ["periodization_goal"], name: "index_weeks_on_periodization_goal"
     t.index ["training_block_id"], name: "index_weeks_on_training_block_id"
   end
 
+  add_foreign_key "ai_load_suggestions", "sections"
   add_foreign_key "alunos", "personals"
   add_foreign_key "alunos", "users"
   add_foreign_key "assinaturas", "alunos"
   add_foreign_key "assinaturas", "planos"
   add_foreign_key "exercicios", "treinos"
+  add_foreign_key "notifications", "users"
   add_foreign_key "pagamentos", "alunos"
   add_foreign_key "pagamentos", "personals"
   add_foreign_key "payment_methods", "personals"
@@ -185,5 +239,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_01_220020) do
   add_foreign_key "training_blocks", "personals"
   add_foreign_key "treinos", "personals"
   add_foreign_key "treinos", "weeks"
+  add_foreign_key "weekly_feedbacks", "alunos"
+  add_foreign_key "weekly_feedbacks", "weeks"
   add_foreign_key "weeks", "training_blocks"
 end

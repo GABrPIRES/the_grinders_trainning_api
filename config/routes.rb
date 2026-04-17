@@ -38,7 +38,16 @@ Rails.application.routes.draw do
       get 'meus_treinos/:id', to: 'meus_treinos#show'
       resource :meu_coach, only: [:show], controller: 'meu_coach'
       resource :minha_assinatura, only: [:show], controller: 'minha_assinatura'
-      resources :sections, only: [:update]
+      resources :sections, only: [:update] do
+        member do
+          put :log  # Aluno registra actual_load, actual_rpe, feito durante execução
+        end
+      end
+      resources :exercicios, only: [] do
+        member do
+          put :log  # Aluno registra observation do exercício (granularidade por exercício)
+        end
+      end
       resources :alunos do
         resources :training_blocks, only: [:index, :create]
         member do
@@ -48,17 +57,54 @@ Rails.application.routes.draw do
       end
       resource :coach_dashboard, only: [:show], controller: :coach_dashboard
       resource :student_dashboard, only: [:show], controller: :student_dashboard
-      resources :training_blocks, only: [:show, :update, :destroy]
-      resources :weeks, only: [:show] do
+      resources :training_blocks, only: [:show, :update, :destroy] do
+        resources :weeks, only: [:create]
+      end
+      resources :weeks, only: [:show, :update] do
         resources :treinos, only: [:index, :create]
         member do
           post :duplicate
+          patch :toggle_feedback  # Coach ativa/desativa formulário semanal
         end
       end
-      resources :treinos, only: [:show, :update, :destroy]
       resources :treinos, only: [:show, :update, :destroy] do
         member do
           post :duplicate
+          post :start    # Aluno inicia o treino → in_progress
+          post :finish   # Aluno finaliza o treino → completed
+        end
+      end
+
+      # Formulário semanal
+      resources :weekly_feedbacks, only: [:create] do
+        collection do
+          get :pending   # Retorna se há formulário pendente para o aluno logado
+        end
+      end
+      post 'weekly_feedbacks/:week_id/snooze', to: 'weekly_feedbacks#snooze', as: :snooze_weekly_feedback
+
+      # Notificações in-app
+      resources :notifications, only: [:index] do
+        member do
+          post :read     # Marca notificação como lida
+        end
+      end
+
+      # Dashboard do coach: revisão e aprovação de sugestões da IA
+      namespace :coach do
+        resources :invite, only: [] # mantém o namespace existente
+        resources :treinos, only: [] do
+          member do
+            post :publish  # Toggle draft ↔ published (sem fluxo de IA)
+            get  :review   # Retorna treino em draft com sugestões da IA por section + observação
+            post :approve  # Coach aprova (com overrides opcionais) → publica o treino
+          end
+        end
+        resources :weeks, only: [] do
+          member do
+            get  :review       # Retorna todos os treinos draft da semana com sugestões da IA
+            post :approve_all  # Aprova todos os treinos draft da semana de uma vez
+          end
         end
       end
     end

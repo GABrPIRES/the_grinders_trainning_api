@@ -13,3 +13,16 @@ production:
   clear_solid_queue_finished_jobs:
     command: "SolidQueue::Job.clear_finished_in_batches(sleep_between_batches: 0.3)"
     schedule: every hour at minute 12
+
+  weekly_feedback_reminder:
+    class: WeeklyFeedbackReminderJob
+    queue: notifications
+    # Roda a cada 6 horas para enviar lembretes aos alunos com snooze pendente.
+    schedule: every 6 hours
+
+  weekly_feedback_coach_alert:
+    class: WeeklyFeedbackCoachAlertJob
+    queue: notifications
+    # Roda domingo às 23:00 (horário do servidor — configurar servidor em America/Sao_Paulo
+    # ou ajustar o horário conforme timezone do servidor de produção).
+    schedule: "0 23 * * 0"
