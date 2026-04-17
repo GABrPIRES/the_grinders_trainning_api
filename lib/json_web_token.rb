@@ -4,7 +4,7 @@
 module JsonWebToken
     SECRET_KEY = Rails.application.credentials.jwt_secret_key
   
-    def self.encode(payload, exp = 24.hours.from_now)
+    def self.encode(payload, exp = 30.days.from_now)
       # Carrega a gem JWT no momento exato do uso.
       require 'jwt'
       payload[:exp] = exp.to_i
