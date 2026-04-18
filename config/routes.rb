@@ -72,6 +72,7 @@ Rails.application.routes.draw do
           post :duplicate
           post :start    # Aluno inicia o treino → in_progress
           post :finish   # Aluno finaliza o treino → completed
+          post :pause    # Aluno cancela início → volta para published
         end
       end
 

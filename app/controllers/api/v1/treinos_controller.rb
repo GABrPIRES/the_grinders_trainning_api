@@ -1,10 +1,10 @@
 class Api::V1::TreinosController < ApplicationController
   before_action :authenticate_request
-  before_action :authorize_admin_or_coach!, except: [ :show, :start, :finish ]
+  before_action :authorize_admin_or_coach!, except: [ :show, :start, :finish, :pause ]
   before_action :set_week, only: [ :index, :create ]
   before_action :set_treino, only: [ :show, :update, :destroy, :duplicate ]
-  before_action :set_treino_public, only: [ :start, :finish ]
-  before_action :authorize_treino_access!, only: [ :start, :finish ]
+  before_action :set_treino_public, only: [ :start, :finish, :pause ]
+  before_action :authorize_treino_access!, only: [ :start, :finish, :pause ]
 
   # GET /api/v1/weeks/:week_id/treinos
   def index
@@ -180,6 +180,39 @@ class Api::V1::TreinosController < ApplicationController
 
     @treino.update!(started_at: Time.current, status: :in_progress)
     render json: { message: "Treino iniciado.", started_at: @treino.started_at }
+  end
+
+  # POST /api/v1/treinos/:id/pause
+  # Aluno cancela o início do treino e volta para published.
+  # Se houver dados registrados nas sections, exige confirmação (force: true).
+  def pause
+    unless @treino.in_progress?
+      return render json: { error: "Este treino não está em andamento." }, status: :unprocessable_entity
+    end
+
+    has_data = Section.joins(exercicio: :treino)
+                      .where(treinos: { id: @treino.id })
+                      .where("sections.feito = TRUE OR sections.actual_load IS NOT NULL OR sections.actual_rpe IS NOT NULL")
+                      .exists?
+
+    force = ActiveModel::Type::Boolean.new.cast(params[:force])
+
+    if has_data && !force
+      return render json: {
+        has_data: true,
+        message: "Você registrou dados neste treino. Ao cancelar, eles serão perdidos."
+      }, status: :conflict
+    end
+
+    ActiveRecord::Base.transaction do
+      Section.joins(exercicio: :treino)
+             .where(treinos: { id: @treino.id })
+             .update_all(feito: false, actual_load: nil, actual_rpe: nil)
+
+      @treino.update!(status: :published, started_at: nil)
+    end
+
+    render json: { message: "Treino cancelado. Você pode iniciá-lo novamente quando quiser." }
   end
 
   # POST /api/v1/treinos/:id/finish
