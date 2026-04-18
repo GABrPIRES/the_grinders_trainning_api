@@ -8,6 +8,8 @@ Rails.application.routes.draw do
       namespace :auth do
         post 'signup', to: 'registrations#create'
         post 'verify_email', to: 'verifications#verify'
+        post 'forgot_password', to: 'password_resets#create'
+        post 'reset_password', to: 'password_resets#update'
       end
       namespace :coach do
         resource :invite, only: [:show], controller: 'invites'

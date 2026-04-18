@@ -1,4 +1,20 @@
 class AuthMailer < ApplicationMailer
+    def reset_password(user)
+      @user = user
+      base_url = ENV.fetch('FRONTEND_URL', 'http://localhost:3001')
+      @url = "#{base_url}/reset-password?token=#{@user.password_reset_token}"
+
+      api_host = Rails.env.production? ? "https://api.thegrinderspowerlifting.com.br" : "http://localhost:3000"
+      @logo_url = "#{api_host}/images/logo_the_grinders_dark-removebg-preview.png"
+
+      destinatario = Rails.env.development? ? "gabriellaeon@gmail.com" : @user.email
+
+      mail(
+        to: destinatario,
+        subject: 'Redefinição de senha — The Grinders Training'
+      )
+    end
+
     def verify_email(user)
       @user = user
       # URL do frontend

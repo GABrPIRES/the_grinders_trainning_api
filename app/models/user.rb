@@ -20,6 +20,23 @@ class User < ApplicationRecord
 
     before_create :generate_verification_token, if: -> { unverified? && aluno? }
 
+    PASSWORD_RESET_EXPIRY = 1.hour
+
+    def generate_password_reset_token!
+      self.password_reset_token = SecureRandom.urlsafe_base64(32)
+      self.password_reset_sent_at = Time.current
+      save!(validate: false)
+      password_reset_token
+    end
+
+    def password_reset_expired?
+      password_reset_sent_at.nil? || password_reset_sent_at < PASSWORD_RESET_EXPIRY.ago
+    end
+
+    def clear_password_reset_token!
+      update_columns(password_reset_token: nil, password_reset_sent_at: nil)
+    end
+
     def as_json(options = {})
       super(options.merge(except: [:password_digest]))
     end
