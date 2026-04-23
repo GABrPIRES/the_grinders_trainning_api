@@ -88,21 +88,20 @@ class Api::V1::CoachDashboardController < ApplicationController
     aluno_scope = aluno_scope.where('alunos.id = ?', aluno_id) if aluno_id
     aluno_ids   = aluno_scope.pluck('alunos.id')
 
-    # Treinos não-draft do período
+    # Treinos não-draft do período (filtra por treinos.day)
     period_treinos = Treino
       .joins(week: :training_block)
       .where(personal_id: @personal.id, training_blocks: { aluno_id: aluno_ids })
-      .where('weeks.start_date <= ? AND weeks.end_date >= ?', end_date, start_date)
+      .where(day: start_date.beginning_of_day..end_date.end_of_day)
       .where.not(status: :draft)
 
-    # Alunos sem treino publicado no período
+    # Alunos sem treino publicado no período (sem join duplicado)
     alunos_com_treino_ids = period_treinos
-      .joins(week: :training_block)
       .distinct
       .pluck('training_blocks.aluno_id')
 
     alunos_sem_treino = aluno_scope
-      .where.not('alunos.id' => alunos_com_treino_ids)
+      .where.not(id: alunos_com_treino_ids)
       .map { |a| { id: a.id, name: a.user.name, email: a.user.email } }
 
     # IDs de treinos ativos (in_progress ou completed)
