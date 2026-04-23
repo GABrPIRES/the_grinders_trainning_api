@@ -13,15 +13,18 @@ class Api::V1::Coach::TreinosController < ApplicationController
       @treino.published!
       render json: { status: "published" }
     when "published"
-      @treino.draft!
+      # Despublica: limpa análise da IA (já foi revisada, não precisa aparecer de novo)
+      AiLoadSuggestion.for_treino(@treino.id).destroy_all
+      @treino.update!(status: :draft, ai_observation: nil)
       render json: { status: "draft" }
     when "in_progress", "completed"
-      # Coach despublica um treino em andamento/concluído: apaga dados do aluno e volta para draft
+      # Coach despublica treino em andamento/concluído: apaga dados do aluno e limpa IA
       ActiveRecord::Base.transaction do
         Section.joins(exercicio: :treino)
                .where(treinos: { id: @treino.id })
                .update_all(feito: false, actual_load: nil, actual_rpe: nil)
-        @treino.update!(status: :draft, started_at: nil, finished_at: nil)
+        AiLoadSuggestion.for_treino(@treino.id).destroy_all
+        @treino.update!(status: :draft, started_at: nil, finished_at: nil, ai_observation: nil)
       end
       render json: { status: "draft" }
     else
