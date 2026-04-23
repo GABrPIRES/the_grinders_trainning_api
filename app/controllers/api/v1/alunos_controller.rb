@@ -10,7 +10,7 @@ class Api::V1::AlunosController < ApplicationController
     base_scope = @current_user.personal.alunos.includes(:user, :assinaturas, :pagamentos)
 
     if params[:search].present?
-      base_scope = base_scope.where("users.name ILIKE ? OR users.email ILIKE ?", "%#{params[:search]}%", "%#{params[:search]}%")
+      base_scope = base_scope.joins(:user).where("users.name ILIKE ? OR users.email ILIKE ?", "%#{params[:search]}%", "%#{params[:search]}%")
     end
 
     # Paginação

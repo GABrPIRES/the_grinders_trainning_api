@@ -15,6 +15,15 @@ class Api::V1::Coach::TreinosController < ApplicationController
     when "published"
       @treino.draft!
       render json: { status: "draft" }
+    when "in_progress", "completed"
+      # Coach despublica um treino em andamento/concluído: apaga dados do aluno e volta para draft
+      ActiveRecord::Base.transaction do
+        Section.joins(exercicio: :treino)
+               .where(treinos: { id: @treino.id })
+               .update_all(feito: false, actual_load: nil, actual_rpe: nil)
+        @treino.update!(status: :draft, started_at: nil, finished_at: nil)
+      end
+      render json: { status: "draft" }
     else
       render json: { error: "Não é possível alterar o status de um treino #{@treino.status}." },
              status: :unprocessable_entity

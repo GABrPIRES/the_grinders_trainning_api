@@ -61,6 +61,9 @@ Rails.application.routes.draw do
       resource :student_dashboard, only: [:show], controller: :student_dashboard
       resources :training_blocks, only: [:show, :update, :destroy] do
         resources :weeks, only: [:create]
+        member do
+          post :duplicate
+        end
       end
       resources :weeks, only: [:show, :update] do
         resources :treinos, only: [:index, :create]

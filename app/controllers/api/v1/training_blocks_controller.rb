@@ -3,7 +3,7 @@ class Api::V1::TrainingBlocksController < ApplicationController
   before_action :authenticate_request
   before_action :authorize_coach!
   before_action :set_aluno, only: [ :index, :create ]
-  before_action :set_training_block, only: [ :show, :update, :destroy ]
+  before_action :set_training_block, only: [ :show, :update, :destroy, :duplicate ]
 
   # ... (actions index, show, destroy permanecem iguais) ...
   def index
@@ -28,6 +28,60 @@ class Api::V1::TrainingBlocksController < ApplicationController
   def destroy
     @training_block.destroy
     render json: { message: "Bloco de treino deletado com sucesso." }, status: :ok
+  end
+
+  # POST /api/v1/training_blocks/:id/duplicate
+  def duplicate
+    target_aluno = @current_user.personal.alunos.find(params[:aluno_id])
+    new_title = params[:title].presence || "#{@training_block.title} (Cópia)"
+
+    new_block = nil
+
+    TrainingBlock.transaction do
+      new_block = target_aluno.training_blocks.create!(
+        title: new_title,
+        personal: @current_user.personal,
+        start_date: @training_block.start_date,
+        end_date: @training_block.end_date,
+        weeks_duration: @training_block.weeks_duration
+      )
+
+      @training_block.weeks.order(week_number: :asc).each do |source_week|
+        new_week = new_block.weeks.create!(
+          week_number: source_week.week_number,
+          periodization_goal: source_week.periodization_goal,
+          start_date: source_week.start_date,
+          end_date: source_week.end_date
+        )
+
+        source_week.treinos.each do |source_treino|
+          new_treino = new_week.treinos.create!(
+            name: source_treino.name,
+            day: source_treino.day,
+            personal_id: @current_user.personal.id,
+            status: :draft
+          )
+
+          source_treino.exercicios.includes(:sections).each do |source_ex|
+            new_ex = new_treino.exercicios.create!(name: source_ex.name)
+
+            source_ex.sections.each do |sec|
+              attrs = sec.attributes.except("id", "exercicio_id", "created_at", "updated_at")
+              attrs["feito"] = false
+              attrs["actual_load"] = nil
+              attrs["actual_rpe"] = nil
+              new_ex.sections.create!(attrs)
+            end
+          end
+        end
+      end
+    end
+
+    render json: new_block, status: :created
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: "Aluno não encontrado ou acesso negado." }, status: :not_found
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { error: e.message }, status: :unprocessable_entity
   end
 
 
