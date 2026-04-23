@@ -180,7 +180,7 @@ class Api::V1::CoachDashboardController < ApplicationController
       .joins('JOIN alunos ON alunos.id = training_blocks.aluno_id JOIN users ON users.id = alunos.user_id')
       .where(id: active_treino_ids)
       .where.not(id: treinos_com_dados)
-      .pluck('treinos.id, treinos.name, treinos.status, treinos.day, users.name')
+      .pluck('treinos.id', 'treinos.name', 'treinos.status', 'treinos.day', 'users.name')
       .map { |id, name, status, day, aluno_name|
         {
           treino_id:   id,
