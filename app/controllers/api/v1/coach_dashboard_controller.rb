@@ -86,7 +86,7 @@ class Api::V1::CoachDashboardController < ApplicationController
     # Escopo de alunos deste coach
     aluno_scope = @personal.alunos.joins(:user)
     aluno_scope = aluno_scope.where('alunos.id = ?', aluno_id) if aluno_id
-    aluno_ids   = aluno_scope.pluck('alunos.id')
+    aluno_ids   = aluno_scope.pluck(:id)
 
     # Treinos não-draft do período (filtra por treinos.day)
     period_treinos = Treino
@@ -95,10 +95,10 @@ class Api::V1::CoachDashboardController < ApplicationController
       .where(day: start_date.beginning_of_day..end_date.end_of_day)
       .where.not(status: :draft)
 
-    # Alunos sem treino publicado no período (sem join duplicado)
+    # Alunos sem treino publicado no período
     alunos_com_treino_ids = period_treinos
       .distinct
-      .pluck('training_blocks.aluno_id')
+      .pluck(Arel.sql('training_blocks.aluno_id'))
 
     alunos_sem_treino = aluno_scope
       .where.not(id: alunos_com_treino_ids)
@@ -110,27 +110,28 @@ class Api::V1::CoachDashboardController < ApplicationController
       .pluck(:id)
 
     # Engagement global (uma query)
-    total_s, feito_c, load_c, rpe_c = Section
+    agg = Section
       .joins(exercicio: :treino)
       .where(treinos: { id: active_treino_ids })
       .pick(
-        'COUNT(*)',
-        'SUM(CASE WHEN sections.feito = true THEN 1 ELSE 0 END)',
-        'SUM(CASE WHEN sections.actual_load IS NOT NULL THEN 1 ELSE 0 END)',
-        'SUM(CASE WHEN sections.actual_rpe  IS NOT NULL THEN 1 ELSE 0 END)'
-      ).map(&:to_i)
+        Arel.sql('COUNT(*)'),
+        Arel.sql('SUM(CASE WHEN sections.feito = true THEN 1 ELSE 0 END)'),
+        Arel.sql('SUM(CASE WHEN sections.actual_load IS NOT NULL THEN 1 ELSE 0 END)'),
+        Arel.sql('SUM(CASE WHEN sections.actual_rpe  IS NOT NULL THEN 1 ELSE 0 END)')
+      )
+    total_s, feito_c, load_c, rpe_c = (agg || [0, 0, 0, 0]).map(&:to_i)
 
     # Engagement por aluno (uma query)
     section_stats = Section
       .joins(exercicio: { treino: { week: :training_block } })
       .where(treinos: { id: active_treino_ids })
-      .group('training_blocks.aluno_id')
+      .group(Arel.sql('training_blocks.aluno_id'))
       .pluck(
-        'training_blocks.aluno_id',
-        'COUNT(*)',
-        'SUM(CASE WHEN sections.feito = true THEN 1 ELSE 0 END)',
-        'SUM(CASE WHEN sections.actual_load IS NOT NULL THEN 1 ELSE 0 END)',
-        'SUM(CASE WHEN sections.actual_rpe  IS NOT NULL THEN 1 ELSE 0 END)'
+        Arel.sql('training_blocks.aluno_id'),
+        Arel.sql('COUNT(*)'),
+        Arel.sql('SUM(CASE WHEN sections.feito = true THEN 1 ELSE 0 END)'),
+        Arel.sql('SUM(CASE WHEN sections.actual_load IS NOT NULL THEN 1 ELSE 0 END)'),
+        Arel.sql('SUM(CASE WHEN sections.actual_rpe  IS NOT NULL THEN 1 ELSE 0 END)')
       )
       .each_with_object({}) { |(aid, tot, f, l, r), h|
         h[aid] = { total: tot.to_i, feito: f.to_i, load: l.to_i, rpe: r.to_i }
@@ -140,11 +141,11 @@ class Api::V1::CoachDashboardController < ApplicationController
     treinos_stats = Treino
       .joins(week: :training_block)
       .where(id: active_treino_ids)
-      .group('training_blocks.aluno_id')
+      .group(Arel.sql('training_blocks.aluno_id'))
       .pluck(
-        'training_blocks.aluno_id',
-        'SUM(CASE WHEN treinos.status = 2 THEN 1 ELSE 0 END)',
-        'SUM(CASE WHEN treinos.status = 3 THEN 1 ELSE 0 END)'
+        Arel.sql('training_blocks.aluno_id'),
+        Arel.sql('SUM(CASE WHEN treinos.status = 2 THEN 1 ELSE 0 END)'),
+        Arel.sql('SUM(CASE WHEN treinos.status = 3 THEN 1 ELSE 0 END)')
       )
       .each_with_object({}) { |(aid, inp, comp), h|
         h[aid] = { in_progress: inp.to_i, completed: comp.to_i }
@@ -172,14 +173,20 @@ class Api::V1::CoachDashboardController < ApplicationController
       .where(treinos: { id: active_treino_ids })
       .where('sections.feito = true OR sections.actual_load IS NOT NULL OR sections.actual_rpe IS NOT NULL')
       .distinct
-      .pluck('treinos.id')
+      .pluck(Arel.sql('treinos.id'))
 
     workouts_without_engagement = Treino
       .joins(week: :training_block)
       .joins('JOIN alunos ON alunos.id = training_blocks.aluno_id JOIN users ON users.id = alunos.user_id')
       .where(id: active_treino_ids)
       .where.not(id: treinos_com_dados)
-      .pluck('treinos.id', 'treinos.name', 'treinos.status', 'treinos.day', 'users.name')
+      .pluck(
+        Arel.sql('treinos.id'),
+        Arel.sql('treinos.name'),
+        Arel.sql('treinos.status'),
+        Arel.sql('treinos.day'),
+        Arel.sql('users.name')
+      )
       .map { |id, name, status, day, aluno_name|
         {
           treino_id:   id,
