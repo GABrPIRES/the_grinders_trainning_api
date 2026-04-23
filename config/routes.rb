@@ -57,7 +57,9 @@ Rails.application.routes.draw do
           post 'finalize_import', to: 'imports#finalize_import'
         end
       end
-      resource :coach_dashboard, only: [:show], controller: :coach_dashboard
+      resource :coach_dashboard, only: [:show], controller: :coach_dashboard do
+        get :training_stats, on: :member
+      end
       resource :student_dashboard, only: [:show], controller: :student_dashboard
       resources :training_blocks, only: [:show, :update, :destroy] do
         resources :weeks, only: [:create]
