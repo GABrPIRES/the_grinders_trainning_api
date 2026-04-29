@@ -16,7 +16,7 @@ Rails.application.routes.draw do
         put 'settings', to: 'invites#update'
         resources :approvals, only: [:index, :update]
         resources :exercicios, only: [:update]
-        resources :exercise_models, only: [:index, :create, :destroy]
+        resources :exercise_models, only: [:index, :create, :update, :destroy]
       end
       get "student_dashboard/show"
       get "coach_dashboard/show"

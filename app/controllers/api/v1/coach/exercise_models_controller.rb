@@ -2,7 +2,7 @@
 class Api::V1::Coach::ExerciseModelsController < ApplicationController
   before_action :authenticate_request
   before_action :authorize_admin_or_coach!
-  before_action :set_model, only: [:destroy]
+  before_action :set_model, only: [:update, :destroy]
 
   # GET /api/v1/coach/exercise_models
   def index
@@ -17,6 +17,15 @@ class Api::V1::Coach::ExerciseModelsController < ApplicationController
       render json: model.as_summary_json, status: :created
     else
       render json: model.errors, status: :unprocessable_entity
+    end
+  end
+
+  # PATCH /api/v1/coach/exercise_models/:id
+  def update
+    if @model.update(exercise_model_params)
+      render json: @model.as_summary_json
+    else
+      render json: @model.errors, status: :unprocessable_entity
     end
   end
 
