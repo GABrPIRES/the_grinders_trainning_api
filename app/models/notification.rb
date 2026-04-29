@@ -6,7 +6,10 @@ class Notification < ApplicationRecord
     feedback_form_available: 0,
     feedback_form_reminder: 1,
     feedback_overdue_coach_alert: 2,
-    coach_review_pending: 3
+    coach_review_pending: 3,
+    week_published: 4,
+    workout_completed: 5,
+    workout_missed: 6
   }
 
   scope :unread, -> { where(read_at: nil) }

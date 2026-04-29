@@ -11,6 +11,7 @@ class Api::V1::Coach::TreinosController < ApplicationController
     case @treino.status
     when "draft"
       @treino.published!
+      notify_week_published_if_complete(@treino.week)
       render json: { status: "published" }
     when "published"
       # Despublica: limpa análise da IA (já foi revisada, não precisa aparecer de novo)
@@ -69,6 +70,8 @@ class Api::V1::Coach::TreinosController < ApplicationController
       AiLoadSuggestion.for_treino(@treino.id).destroy_all
     end
 
+    notify_week_published_if_complete(@treino.week)
+
     render json: {
       message: "Treino aprovado e publicado.",
       treino_id: @treino.id,
@@ -77,6 +80,11 @@ class Api::V1::Coach::TreinosController < ApplicationController
   end
 
   private
+
+  def notify_week_published_if_complete(week)
+    return if week.treinos.draft.exists?
+    NotificationService.on_week_published(week: week, coach_user: @current_user)
+  end
 
   def set_and_authorize_treino
     @treino = Treino.joins(week: { training_block: :personal })

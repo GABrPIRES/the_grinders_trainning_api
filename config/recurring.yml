@@ -26,3 +26,9 @@ production:
     # Roda domingo às 23:00 (horário do servidor — configurar servidor em America/Sao_Paulo
     # ou ajustar o horário conforme timezone do servidor de produção).
     schedule: "0 23 * * 0"
+
+  workout_missed_check:
+    class: WorkoutMissedCheckJob
+    queue: notifications
+    # Roda segunda-feira às 08:00 — verifica treinos não realizados na semana anterior.
+    schedule: "0 8 * * 1"

@@ -225,6 +225,8 @@ class Api::V1::TreinosController < ApplicationController
 
     @treino.update!(finished_at: Time.current, status: :completed)
 
+    NotificationService.on_workout_completed(treino: @treino, aluno_user: @current_user)
+
     week = @treino.week
     feedback_payload = if week.feedback_available?(@current_user.aluno)
       {

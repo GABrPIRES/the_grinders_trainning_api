@@ -14,7 +14,5 @@ class CreateExerciseModels < ActiveRecord::Migration[7.1]
 
       t.timestamps
     end
-
-    add_index :exercise_models, :coach_id
   end
 end

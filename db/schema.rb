@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_04_18_033832) do
+ActiveRecord::Schema[8.0].define(version: 2026_04_29_000003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -69,7 +69,25 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_18_033832) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.text "observation"
+    t.text "coach_comment"
+    t.text "video_link"
     t.index ["treino_id"], name: "index_exercicios_on_treino_id"
+  end
+
+  create_table "exercise_models", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "coach_id", null: false
+    t.string "name", null: false
+    t.string "exercise_name", null: false
+    t.decimal "load", precision: 8, scale: 2
+    t.string "load_unit", default: "kg"
+    t.integer "series"
+    t.string "reps"
+    t.decimal "rpe", precision: 4, scale: 1
+    t.text "coach_comment"
+    t.text "video_link"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["coach_id"], name: "index_exercise_models_on_coach_id"
   end
 
   create_table "notifications", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -231,6 +249,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_18_033832) do
   add_foreign_key "assinaturas", "alunos"
   add_foreign_key "assinaturas", "planos"
   add_foreign_key "exercicios", "treinos"
+  add_foreign_key "exercise_models", "personals", column: "coach_id"
   add_foreign_key "notifications", "users"
   add_foreign_key "pagamentos", "alunos"
   add_foreign_key "pagamentos", "personals"

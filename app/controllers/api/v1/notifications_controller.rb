@@ -6,14 +6,7 @@ class Api::V1::NotificationsController < ApplicationController
   # Retorna notificações não lidas do usuário logado (máximo 50).
   def index
     @notifications = @current_user.notifications.unread.order(created_at: :desc).limit(50)
-    render json: @notifications.map { |n|
-      {
-        id: n.id,
-        type: n.notification_type,
-        payload: n.payload,
-        created_at: n.created_at
-      }
-    }
+    render json: @notifications.map { |n| serialize(n) }
   end
 
   # POST /api/v1/notifications/:id/read
@@ -24,5 +17,24 @@ class Api::V1::NotificationsController < ApplicationController
     render json: { message: "Notificação marcada como lida." }
   rescue ActiveRecord::RecordNotFound
     render json: { error: "Notificação não encontrada." }, status: :not_found
+  end
+
+  # POST /api/v1/notifications/read_all
+  # Marca todas as notificações não lidas como lidas.
+  def read_all
+    @current_user.notifications.unread.update_all(read_at: Time.current)
+    render json: { message: "Todas as notificações foram marcadas como lidas." }
+  end
+
+  private
+
+  def serialize(n)
+    {
+      id:         n.id,
+      type:       n.notification_type,
+      payload:    n.payload,
+      read_at:    n.read_at,
+      created_at: n.created_at
+    }
   end
 end

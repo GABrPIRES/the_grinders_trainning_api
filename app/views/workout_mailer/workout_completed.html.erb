@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta content='text/html; charset=UTF-8' http-equiv='Content-Type' />
+</head>
+<body style="font-family: sans-serif; background-color: #f4f4f5; margin: 0; padding: 0;">
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f4f5;">
+    <tr>
+      <td align="center" style="padding: 20px 0;">
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+
+          <tr>
+            <td align="center" style="padding: 20px 10px;">
+              <img src="<%= @logo_url %>" alt="The Grinders" width="220" style="display: block; border: 0; max-width: 100%; height: auto;">
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding: 10px 30px;">
+              <h2 style="color: #171717; margin: 0 0 12px 0; font-size: 22px; text-align: center;">✅ Treino concluído!</h2>
+              <p style="color: #52525b; font-size: 15px; line-height: 1.6; margin: 0 0 20px 0;">
+                Olá, <strong><%= @coach.name.split(" ").first %></strong>!<br>
+                <strong><%= @aluno.name %></strong> concluiu o treino <strong><%= @treino.name %></strong>.
+              </p>
+
+              <% duration = @treino.duration_seconds %>
+              <% if duration && duration > 0 %>
+              <p style="color: #71717a; font-size: 13px; margin: 0 0 16px 0;">
+                ⏱️ Duração: <%= (duration / 60).floor %>min <%= duration % 60 %>s
+              </p>
+              <% end %>
+
+              <% if @sections.any? %>
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="border: 1px solid #e4e4e7; border-radius: 6px; overflow: hidden; margin-bottom: 24px;">
+                <tr style="background-color: #f4f4f5;">
+                  <td style="padding: 8px 12px; font-size: 12px; font-weight: bold; color: #71717a; text-transform: uppercase;">Exercício</td>
+                  <td style="padding: 8px 12px; font-size: 12px; font-weight: bold; color: #71717a; text-align: center;">Feito</td>
+                  <td style="padding: 8px 12px; font-size: 12px; font-weight: bold; color: #71717a; text-align: center;">Carga</td>
+                  <td style="padding: 8px 12px; font-size: 12px; font-weight: bold; color: #71717a; text-align: center;">RPE</td>
+                </tr>
+                <% @sections.each_with_index do |s, i| %>
+                <tr style="background-color: <%= i.even? ? '#ffffff' : '#fafafa' %>;">
+                  <td style="padding: 8px 12px; font-size: 13px; color: #171717;"><%= s[:exercise] %></td>
+                  <td style="padding: 8px 12px; font-size: 13px; text-align: center; color: <%= s[:feito] ? '#16a34a' : '#dc2626' %>;"><%= s[:feito] ? '✓' : '✗' %></td>
+                  <td style="padding: 8px 12px; font-size: 13px; text-align: center; color: #52525b;"><%= s[:load] ? "#{s[:load]} kg" : '—' %></td>
+                  <td style="padding: 8px 12px; font-size: 13px; text-align: center; color: #52525b;"><%= s[:rpe] || '—' %></td>
+                </tr>
+                <% end %>
+              </table>
+              <% end %>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="background-color: #fafafa; padding: 20px; text-align: center; border-top: 1px solid #e4e4e7; color: #71717a; font-size: 12px;">
+              © <%= Time.current.year %> The Grinders Training.
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

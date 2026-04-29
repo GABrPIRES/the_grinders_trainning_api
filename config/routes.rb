@@ -96,8 +96,21 @@ Rails.application.routes.draw do
       # Notificações in-app
       resources :notifications, only: [:index] do
         member do
-          post :read     # Marca notificação como lida
+          post :read       # Marca notificação como lida
         end
+        collection do
+          post :read_all   # Marca todas como lidas
+        end
+      end
+
+      # Preferências de notificação do coach
+      namespace :coach do
+        resource :notification_preferences, only: [:show, :update], controller: :notification_preferences
+      end
+
+      # Configurações globais do admin
+      namespace :admin do
+        resource :settings, only: [:show, :update], controller: :settings
       end
 
       # Dashboard do coach: revisão e aprovação de sugestões da IA
