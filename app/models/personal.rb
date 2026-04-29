@@ -6,6 +6,7 @@ class Personal < ApplicationRecord
   has_many :treinos, dependent: :destroy
   has_many :planos, dependent: :destroy
   has_many :pagamentos, dependent: :destroy
+  has_many :exercise_models, foreign_key: 'coach_id', dependent: :destroy
 
   # Retorna o código atual se válido, ou gera um novo
   def active_signup_code

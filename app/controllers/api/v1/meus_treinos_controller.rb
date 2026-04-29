@@ -27,8 +27,14 @@ class Api::V1::MeusTreinosController < ApplicationController
                     .find(params[:id])
 
     feedback_submitted = WeeklyFeedback.exists?(week: @treino.week, aluno: @aluno_profile)
-    render json: @treino.as_json(include: { exercicios: { include: :sections } })
-                        .merge(feedback_submitted: feedback_submitted)
+    render json: @treino.as_json(
+      include: {
+        exercicios: {
+          only: [:id, :name, :observation, :coach_comment, :video_link],
+          include: { sections: { only: [:id, :carga, :load_unit, :series, :reps, :equip, :rpe, :pr, :feito, :actual_load, :actual_rpe] } }
+        }
+      }
+    ).merge(feedback_submitted: feedback_submitted)
   rescue ActiveRecord::RecordNotFound
     render json: { error: "Treino não encontrado ou não pertence a este aluno." }, status: :not_found
   end

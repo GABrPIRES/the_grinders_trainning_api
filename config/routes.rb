@@ -13,8 +13,10 @@ Rails.application.routes.draw do
       end
       namespace :coach do
         resource :invite, only: [:show], controller: 'invites'
-        put 'settings', to: 'invites#update' # <--- Add this line
+        put 'settings', to: 'invites#update'
         resources :approvals, only: [:index, :update]
+        resources :exercicios, only: [:update]
+        resources :exercise_models, only: [:index, :create, :destroy]
       end
       get "student_dashboard/show"
       get "coach_dashboard/show"
