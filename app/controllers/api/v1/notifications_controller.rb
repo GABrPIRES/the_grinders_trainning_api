@@ -3,10 +3,11 @@ class Api::V1::NotificationsController < ApplicationController
   before_action :authenticate_request
 
   # GET /api/v1/notifications
-  # Retorna notificações não lidas do usuário logado (máximo 50).
+  # Retorna notificações do usuário. filter=all retorna todas; padrão retorna não lidas.
   def index
-    @notifications = @current_user.notifications.unread.order(created_at: :desc).limit(50)
-    render json: @notifications.map { |n| serialize(n) }
+    scope = @current_user.notifications.order(created_at: :desc).limit(50)
+    scope = scope.unread unless params[:filter] == "all"
+    render json: scope.map { |n| serialize(n) }
   end
 
   # POST /api/v1/notifications/:id/read

@@ -1,6 +1,7 @@
 # app/models/treino.rb
 class Treino < ApplicationRecord
   belongs_to :week
+  belongs_to :personal
 
   has_many :exercicios, dependent: :destroy
   has_many :sections, through: :exercicios

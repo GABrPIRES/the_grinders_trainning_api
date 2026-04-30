@@ -38,6 +38,13 @@ module NotificationService
       }
     )
 
+    SendPushNotificationJob.perform_later(
+      user_id: aluno_user.id,
+      title:   "Novos treinos disponíveis 💪",
+      body:    "Semana #{week.week_number} de \"#{training_block.title}\" publicada por #{coach_user.name}.",
+      url:     "/aluno/treinos"
+    )
+
     if AdminSetting.emails_enabled? && personal.email_students_on_publish
       WorkoutMailer.week_published(aluno_user, week, coach_user).deliver_later
     end
@@ -50,6 +57,22 @@ module NotificationService
     personal  = treino.personal
     aluno     = aluno_user.aluno
 
+    exercicios_data = treino.exercicios.includes(:sections).map do |ex|
+      {
+        name:     ex.name,
+        sections: ex.sections.map do |s|
+          {
+            series:      s.series,
+            reps:        s.reps,
+            actual_load: s.actual_load,
+            load_unit:   s.load_unit,
+            actual_rpe:  s.actual_rpe,
+            feito:       s.feito
+          }
+        end
+      }
+    end
+
     notify_coach(
       personal: personal,
       type:     :workout_completed,
@@ -59,8 +82,16 @@ module NotificationService
         aluno_name:       aluno_user.name,
         aluno_id:         aluno&.id,
         duration_seconds: treino.duration_seconds,
-        route:            "/coach/students/#{aluno&.id}"
+        exercicios:       exercicios_data,
+        route:            "/coach/treinos/#{aluno&.id}/#{treino.id}"
       }
+    )
+
+    SendPushNotificationJob.perform_later(
+      user_id: personal.user.id,
+      title:   "#{aluno_user.name} concluiu um treino",
+      body:    "#{treino.name}. Toque para ver detalhes.",
+      url:     "/coach/treinos/#{aluno&.id}/#{treino.id}"
     )
 
     if AdminSetting.emails_enabled? && personal.email_on_workout_completed
@@ -90,6 +121,13 @@ module NotificationService
     )
 
     treino.update_column(:missed_notified_at, Time.current)
+
+    SendPushNotificationJob.perform_later(
+      user_id: personal.user.id,
+      title:   "#{aluno_user.name} não realizou um treino",
+      body:    "\"#{treino.name}\" não foi concluído.",
+      url:     "/coach/students/#{aluno.id}"
+    )
 
     if AdminSetting.emails_enabled? && personal.email_on_workout_missed
       WorkoutMailer.workout_missed(personal.user, treino).deliver_later

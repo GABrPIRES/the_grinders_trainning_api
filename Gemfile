@@ -60,3 +60,5 @@ group :development, :test do
 end
 
 gem "rack-attack", "~> 6.8"
+
+gem "web-push"

@@ -20,11 +20,14 @@ class Api::V1::Admin::SettingsController < ApplicationController
   private
 
   def allowed_params
-    params.require(:settings).permit(:emails_enabled)
+    params.require(:settings).permit(:emails_enabled, :push_enabled)
   end
 
   def settings_json
-    { emails_enabled: AdminSetting.emails_enabled? }
+    {
+      emails_enabled: AdminSetting.emails_enabled?,
+      push_enabled:   AdminSetting.push_enabled?
+    }
   end
 
   def authorize_admin!

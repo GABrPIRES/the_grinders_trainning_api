@@ -93,6 +93,14 @@ Rails.application.routes.draw do
       end
       post 'weekly_feedbacks/:week_id/snooze', to: 'weekly_feedbacks#snooze', as: :snooze_weekly_feedback
 
+      # Web Push subscriptions
+      resources :push_subscriptions, only: [:create] do
+        collection do
+          get    :vapid_public_key
+          delete :destroy
+        end
+      end
+
       # Notificações in-app
       resources :notifications, only: [:index] do
         member do

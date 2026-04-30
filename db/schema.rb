@@ -10,10 +10,17 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_04_29_000003) do
+ActiveRecord::Schema[8.0].define(version: 2026_05_01_000005) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
+
+  create_table "admin_settings", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.boolean "emails_enabled", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.boolean "push_enabled", default: false, null: false
+  end
 
   create_table "ai_load_suggestions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "section_id", null: false
@@ -134,6 +141,10 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_29_000003) do
     t.string "signup_code"
     t.datetime "signup_code_expires_at"
     t.boolean "auto_approve_students", default: false
+    t.boolean "notifications_enabled", default: true, null: false
+    t.boolean "email_on_workout_completed", default: true, null: false
+    t.boolean "email_on_workout_missed", default: true, null: false
+    t.boolean "email_students_on_publish", default: true, null: false
     t.index ["signup_code"], name: "index_personals_on_signup_code", unique: true
     t.index ["user_id"], name: "index_personals_on_user_id"
   end
@@ -147,6 +158,18 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_29_000003) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["personal_id"], name: "index_planos_on_personal_id"
+  end
+
+  create_table "push_subscriptions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "user_id", null: false
+    t.string "endpoint", null: false
+    t.string "p256dh", null: false
+    t.string "auth", null: false
+    t.string "user_agent"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["endpoint"], name: "index_push_subscriptions_on_endpoint", unique: true
+    t.index ["user_id"], name: "index_push_subscriptions_on_user_id"
   end
 
   create_table "sections", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -190,6 +213,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_29_000003) do
     t.datetime "started_at"
     t.datetime "finished_at"
     t.text "ai_observation"
+    t.datetime "missed_notified_at"
     t.index ["personal_id"], name: "index_treinos_on_personal_id"
     t.index ["status"], name: "index_treinos_on_status"
     t.index ["week_id"], name: "index_treinos_on_week_id"
@@ -256,6 +280,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_29_000003) do
   add_foreign_key "payment_methods", "personals"
   add_foreign_key "personals", "users"
   add_foreign_key "planos", "personals"
+  add_foreign_key "push_subscriptions", "users"
   add_foreign_key "sections", "exercicios"
   add_foreign_key "training_blocks", "alunos"
   add_foreign_key "training_blocks", "personals"

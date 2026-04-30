@@ -8,4 +8,8 @@ class AdminSetting < ApplicationRecord
   def self.emails_enabled?
     instance.emails_enabled
   end
+
+  def self.push_enabled?
+    instance.push_enabled
+  end
 end
