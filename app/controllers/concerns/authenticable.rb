@@ -18,6 +18,8 @@ module Authenticable
       return render_unauthorized if token.nil?
 
       decoded = JsonWebToken.decode(token)
+      return render_unauthorized if decoded[:jti] && JwtBlocklist.blocked?(decoded[:jti])
+
       @current_user = User.find(decoded[:user_id])
     rescue ActiveRecord::RecordNotFound, JWT::DecodeError
       render_unauthorized

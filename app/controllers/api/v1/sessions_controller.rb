@@ -45,11 +45,19 @@ class Api::V1::SessionsController < ApplicationController
   end
 
   def destroy
-    # [CORREÇÃO] Para deletar o cookie, precisamos passar as MESMAS opções de domínio
-    delete_options = {}
-    if Rails.env.production?
-      delete_options[:domain] = :all
+    token = cookies[:jwt] || request.headers['Authorization']&.split(' ')&.last
+
+    if token
+      begin
+        decoded = JsonWebToken.decode(token)
+        JwtBlocklist.add(decoded[:jti], decoded[:exp]) if decoded[:jti]
+      rescue JWT::DecodeError
+        # Token inválido — segue limpando o cookie sem bloquear logout
+      end
     end
+
+    delete_options = {}
+    delete_options[:domain] = :all if Rails.env.production?
 
     cookies.delete(:jwt, **delete_options)
     render json: { message: 'Deslogado com sucesso' }, status: :ok
