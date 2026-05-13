@@ -13,6 +13,13 @@ class User < ApplicationRecord
   
     validates :name, presence: true
     validates :email, presence: true, uniqueness: true, format: { with: URI::MailTo::EMAIL_REGEXP }
+    validates :password,
+      length: { minimum: 12, message: "deve ter pelo menos 12 caracteres" },
+      format: {
+        with: /\A(?=.*[A-Z])(?=.*[a-z])(?=.*\d).+\z/,
+        message: "deve conter maiúscula, minúscula e número"
+      },
+      if: -> { password.present? }
   
     has_one :personal, dependent: :destroy
     has_one :aluno, dependent: :destroy
