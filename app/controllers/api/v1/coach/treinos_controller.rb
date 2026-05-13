@@ -83,6 +83,7 @@ class Api::V1::Coach::TreinosController < ApplicationController
 
   def notify_week_published_if_complete(week)
     return if week.treinos.draft.exists?
+    WeekPublishHandler.expire_prior_weeks(week)
     NotificationService.on_week_published(week: week, coach_user: @current_user)
   end
 

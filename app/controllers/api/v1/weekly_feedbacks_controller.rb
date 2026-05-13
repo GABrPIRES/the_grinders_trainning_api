@@ -30,6 +30,11 @@ class Api::V1::WeeklyFeedbacksController < ApplicationController
                .where(training_blocks: { aluno_id: @current_user.aluno.id })
                .find(feedback_params[:week_id])
 
+    if week.feedback_expired?
+      return render json: { error: "Esta semana já foi encerrada e não aceita mais respostas." },
+                    status: :unprocessable_entity
+    end
+
     unless week.feedback_enabled?
       return render json: { error: "O formulário semanal está desativado para esta semana." },
                     status: :unprocessable_entity
