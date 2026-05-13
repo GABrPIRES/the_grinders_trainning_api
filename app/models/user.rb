@@ -38,8 +38,17 @@ class User < ApplicationRecord
       update_columns(password_reset_token: nil, password_reset_sent_at: nil)
     end
 
-    def as_json(options = {})
-      super(options.merge(except: [:password_digest]))
+    SENSITIVE_FIELDS = %i[
+      password_digest
+      password_reset_token
+      password_reset_sent_at
+      verification_token
+    ].freeze
+
+    def serializable_hash(options = nil)
+      options ||= {}
+      excepted = SENSITIVE_FIELDS + Array(options[:except])
+      super(options.merge(except: excepted))
     end
 
     private

@@ -35,7 +35,7 @@ class Api::V1::AlunosController < ApplicationController
       ultimo_treino_atualizado = treinos_scope.order(updated_at: :desc).first
       # ---------------------------
 
-      aluno.as_json(include: :user).merge(
+      aluno.as_json(include: { user: user_safe_fields }).merge(
         pagamento: {
           vencimento: proximo_pagamento&.due_date,
           status: assinatura_ativa&.status
@@ -75,7 +75,7 @@ class Api::V1::AlunosController < ApplicationController
       }
     end
 
-    aluno_com_detalhes = @aluno.as_json(include: :user).merge(
+    aluno_com_detalhes = @aluno.as_json(include: { user: user_safe_fields }).merge(
       pagamento: {
         vencimento: proximo_pagamento&.due_date,
         status: assinatura_ativa&.status
@@ -124,7 +124,7 @@ class Api::V1::AlunosController < ApplicationController
         end
       end
     
-      render json: @aluno, include: :user, status: :created
+      render json: @aluno.as_json(include: { user: user_safe_fields }), status: :created
     rescue ActiveRecord::RecordInvalid => e
       render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
     end
@@ -173,7 +173,7 @@ class Api::V1::AlunosController < ApplicationController
       end
     end
 
-    render json: @aluno, include: :user
+    render json: @aluno.as_json(include: { user: user_safe_fields })
   rescue ActiveRecord::RecordInvalid => e
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end
@@ -196,5 +196,9 @@ class Api::V1::AlunosController < ApplicationController
     unless @current_user.personal?
       render json: { error: 'Acesso não autorizado' }, status: :forbidden
     end
+  end
+
+  def user_safe_fields
+    { only: %i[id name email role status email_verified_at] }
   end
 end
