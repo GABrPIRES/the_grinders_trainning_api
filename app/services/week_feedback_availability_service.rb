@@ -12,7 +12,7 @@ class WeekFeedbackAvailabilityService
   end
 
   # Retorna o hash de status ou nil se não há formulário pendente.
-  # { week_id:, deadline_at:, incomplete_treinos: [] }
+  # { week_id:, deadline_at:, incomplete_treinos: [], start_date:, end_date:, date_range_label: }
   def pending_week
     week = find_week_pending_feedback
     return nil unless week
@@ -20,16 +20,20 @@ class WeekFeedbackAvailabilityService
     {
       week_id: week.id,
       deadline_at: deadline_for(week),
-      incomplete_treinos: week.incomplete_treino_names
+      incomplete_treinos: week.incomplete_treino_names,
+      start_date: week.start_date,
+      end_date: week.end_date,
+      date_range_label: week.date_range_label
     }
   end
 
   private
 
   # Busca qualquer semana do aluno onde o feedback ainda está disponível.
-  # Percorre todas as semanas com treinos não-draft completed, da mais recente para a mais antiga.
+  # Percorre apenas semanas ativas (não expiradas), da mais recente para a mais antiga.
   def find_week_pending_feedback
-    weeks = Week.joins(training_block: :aluno)
+    weeks = Week.feedback_active
+                .joins(training_block: :aluno)
                 .where(training_blocks: { aluno_id: @aluno.id })
                 .joins(:treinos)
                 .distinct

@@ -13,7 +13,10 @@ class Api::V1::WeeklyFeedbacksController < ApplicationController
         pending: true,
         week_id: result[:week_id],
         deadline_at: result[:deadline_at],
-        incomplete_treinos: result[:incomplete_treinos]
+        incomplete_treinos: result[:incomplete_treinos],
+        start_date: result[:start_date],
+        end_date: result[:end_date],
+        date_range_label: result[:date_range_label]
       }
     else
       render json: { pending: false }
