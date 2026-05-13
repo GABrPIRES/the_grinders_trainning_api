@@ -15,6 +15,10 @@ class WeeklyFeedbackReminderJob < ApplicationJob
       last_notif = last_reminder_for(aluno, week)
       next if last_notif && last_notif.created_at > REMINDER_INTERVAL.ago
 
+      # Dedup: marca reminders antigos do mesmo aluno+semana como lidos antes
+      # de criar o novo. Mantém no máximo 1 reminder não-lido por semana.
+      previous_reminders_for(aluno, week).update_all(read_at: Time.current)
+
       aluno.user.notifications.create!(
         notification_type: :feedback_form_reminder,
         payload: {
@@ -29,10 +33,18 @@ class WeeklyFeedbackReminderJob < ApplicationJob
   private
 
   def weeks_needing_reminder
-    Week.joins(training_block: :aluno)
+    Week.feedback_active
+        .joins(training_block: :aluno)
         .where.not(snoozed_at: nil)
         .where(coach_alerted_at: nil)
         .includes(training_block: :aluno)
+  end
+
+  def previous_reminders_for(aluno, week)
+    aluno.user.notifications
+         .where(notification_type: :feedback_form_reminder)
+         .where("payload->>'week_id' = ?", week.id)
+         .where(read_at: nil)
   end
 
   def last_reminder_for(aluno, week)

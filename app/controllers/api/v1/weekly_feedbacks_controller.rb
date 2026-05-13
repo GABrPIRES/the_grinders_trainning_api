@@ -81,6 +81,14 @@ class Api::V1::WeeklyFeedbacksController < ApplicationController
 
     week.update!(snoozed_at: Time.current)
 
+    # Dedup: marca lembretes anteriores da mesma semana como lidos para manter
+    # apenas 1 reminder ativo no dropdown.
+    @current_user.notifications
+                 .where(notification_type: :feedback_form_reminder)
+                 .where("payload->>'week_id' = ?", week.id)
+                 .where(read_at: nil)
+                 .update_all(read_at: Time.current)
+
     @current_user.notifications.create!(
       notification_type: :feedback_form_reminder,
       payload: {
