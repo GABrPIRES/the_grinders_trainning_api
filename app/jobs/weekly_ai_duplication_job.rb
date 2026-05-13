@@ -9,13 +9,23 @@ class WeeklyAiDuplicationJob < ApplicationJob
   retry_on GeminiClient::GeminiError, wait: :polynomially_longer, attempts: 3
 
   def perform(source_week_id, weekly_feedback_id)
+    source_week = Week.includes(treinos: { exercicios: :sections }).find(source_week_id)
+
+    # Idempotência estrutural: se já existe uma semana posterior com treinos
+    # publicados, a duplicação não tem mais propósito (coach já avançou). Evita
+    # criar weeks extras quando feedbacks atrasados são submetidos.
+    if next_week_already_published?(source_week)
+      Rails.logger.info "[WeeklyAiDuplicationJob] skipping for week ##{source_week_id} — next week already has published treinos"
+      return
+    end
+
     lock_key = "weekly_ai_dup:#{source_week_id}"
 
-    # Idempotency guard: se o job já está rodando ou rodou com sucesso, para.
+    # Idempotency guard de curto prazo: protege contra reenfileiramentos do
+    # mesmo job dentro de 1h (double-run por retry/concorrência).
     acquired = Rails.cache.write(lock_key, true, expires_in: 1.hour, unless_exist: true)
     return unless acquired
 
-    source_week = Week.includes(treinos: { exercicios: :sections }).find(source_week_id)
     weekly_feedback = WeeklyFeedback.find(weekly_feedback_id)
 
     # 1. Clonar a semana.
@@ -49,6 +59,20 @@ class WeeklyAiDuplicationJob < ApplicationJob
   end
 
   private
+
+  # Verifica se a próxima semana do bloco já existe e possui treinos não-draft.
+  # Quando o coach já publicou a semana seguinte (ou alguém criou semanas
+  # adiante), uma duplicação tardia ia gerar registros inconsistentes ou
+  # semanas extras — exatamente o cenário do bug reportado em sprint 004.
+  def next_week_already_published?(source_week)
+    block = source_week.training_block
+    next_week = block.weeks
+                     .where("week_number > ?", source_week.week_number)
+                     .order(:week_number)
+                     .first
+    return false if next_week.nil?
+    next_week.treinos.where.not(status: :draft).exists?
+  end
 
   def notify_coach(source_week, new_week)
     personal = source_week.training_block.personal
