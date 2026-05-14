@@ -58,6 +58,11 @@ class Api::V1::WeeklyFeedbacksController < ApplicationController
     )
 
     if feedback.save
+      # Responder a semana mais recente fecha automaticamente a janela das
+      # anteriores ainda pendentes — defesa adicional para casos em que o
+      # hook do publish não foi disparado (ex: importação manual de treinos,
+      # estados inconsistentes históricos).
+      WeekPublishHandler.expire_prior_weeks(week)
       WeeklyAiDuplicationJob.perform_later(week.id, feedback.id)
       render json: { message: "Formulário enviado! A próxima semana será gerada em breve.", id: feedback.id },
              status: :created
