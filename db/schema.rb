@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_05_14_032340) do
+ActiveRecord::Schema[8.0].define(version: 2026_05_14_133656) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -339,6 +339,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_05_14_032340) do
     t.datetime "finished_at"
     t.text "ai_observation"
     t.datetime "missed_notified_at"
+    t.boolean "created_by_ai", default: false, null: false
+    t.index ["created_by_ai"], name: "index_treinos_on_created_by_ai"
     t.index ["personal_id"], name: "index_treinos_on_personal_id"
     t.index ["status"], name: "index_treinos_on_status"
     t.index ["week_id"], name: "index_treinos_on_week_id"
