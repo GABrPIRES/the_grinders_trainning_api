@@ -119,6 +119,7 @@ Rails.application.routes.draw do
       # Configurações globais do admin
       namespace :admin do
         resource :settings, only: [:show, :update], controller: :settings
+        resources :ai_permissions, only: [:index, :update], param: :personal_id
       end
 
       # Dashboard do coach: revisão e aprovação de sugestões da IA
