@@ -12,4 +12,8 @@ class AdminSetting < ApplicationRecord
   def self.push_enabled?
     instance.push_enabled
   end
+
+  def self.ai_enabled_global?
+    instance.ai_enabled_global
+  end
 end

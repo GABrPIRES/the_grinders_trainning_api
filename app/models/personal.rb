@@ -8,6 +8,15 @@ class Personal < ApplicationRecord
   has_many :pagamentos, dependent: :destroy
   has_many :exercise_models, foreign_key: 'coach_id', dependent: :destroy
 
+  # IA de auto-regulação de cargas roda para este coach apenas se as três flags
+  # estão habilitadas:
+  #   - admin ativou IA globalmente (AdminSetting.ai_enabled_global)
+  #   - admin habilitou IA especificamente para este coach (ai_enabled_by_admin)
+  #   - o próprio coach não se autodesativou (ai_enabled)
+  def ai_runs?
+    AdminSetting.ai_enabled_global? && ai_enabled_by_admin && ai_enabled
+  end
+
   # Retorna o código atual se válido, ou gera um novo
   def active_signup_code
     if signup_code.present? && signup_code_expires_at > Time.current
