@@ -114,6 +114,9 @@ Rails.application.routes.draw do
       # Preferências de notificação do coach
       namespace :coach do
         resource :notification_preferences, only: [:show, :update], controller: :notification_preferences
+
+        get   "settings",             to: "settings#show"
+        patch "settings/ai_enabled",  to: "settings#update_ai_enabled"
       end
 
       # Configurações globais do admin
