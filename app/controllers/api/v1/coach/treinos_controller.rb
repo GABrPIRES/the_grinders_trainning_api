@@ -58,11 +58,19 @@ class Api::V1::Coach::TreinosController < ApplicationController
       @treino.exercicios.includes(sections: :ai_load_suggestions).each do |exercicio|
         exercicio.sections.each do |section|
           suggestion = section.ai_load_suggestions.pending.order(created_at: :desc).first
-          next unless suggestion
+          override   = overrides[section.id.to_s]
 
-          final_load = overrides[section.id.to_s] || suggestion.suggested_load
-          section.update!(carga: final_load)
-          suggestion.approved!
+          # 3 casos:
+          # 1) coach editou a carga manualmente (override presente) → aplica o override
+          # 2) IA sugeriu e coach aceitou sem editar → aplica suggested_load
+          # 3) sem suggestion nem override → mantém a carga prescrita (não faz nada)
+          if override
+            section.update!(carga: override)
+            suggestion&.approved!
+          elsif suggestion
+            section.update!(carga: suggestion.suggested_load)
+            suggestion.approved!
+          end
         end
       end
 

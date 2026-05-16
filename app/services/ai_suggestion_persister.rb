@@ -36,6 +36,10 @@ class AiSuggestionPersister
 
         suggested_load = section_suggestion["suggested_load"].to_f
         prescribed_load = new_section.carga.to_f
+        # IA agora retorna todas as sections (mesmo iguais à prescrita) pra rastreabilidade.
+        # Só persistimos quando há mudança real — UI usa prescribed_load como fallback no input.
+        next if (suggested_load - prescribed_load).abs < 0.01
+
         critical = load_change_critical?(prescribed_load, suggested_load)
 
         new_section.ai_load_suggestions.create!(
