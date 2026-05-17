@@ -30,10 +30,6 @@ class WeeklyDuplicationService
       new_week.save! if new_week.new_record?
 
       @source_week.treinos.includes(exercicios: :sections).each do |treino|
-        # Dedup: se destino já tem um treino mesmo nome+weekday, preserva o destino
-        # e não duplica este da origem.
-        next if existing_treino_in_target?(treino, new_week)
-
         new_treino = duplicate_treino(treino, new_week)
         treino_id_map[treino.id.to_s] = new_treino
 
@@ -54,8 +50,10 @@ class WeeklyDuplicationService
   private
 
   # Reutiliza a próxima semana se já existe no bloco; caso contrário, cria.
-  # IMPORTANTE: não destrói mais drafts do destino — agora dedupamos por
-  # (weekday, name) durante a iteração de treinos, preservando trabalho do coach.
+  # IMPORTANTE: não destrói mais drafts do destino (mudança da sprint 005) e
+  # também não dedupa por (weekday, name) — todos os treinos da source são
+  # duplicados, mesmo que já exista treino do coach no mesmo dia (extensão
+  # sprint 006). Coach decide o que manter na revisão.
   def find_or_build_new_week
     block = @source_week.training_block
     next_number = @source_week.week_number + 1
@@ -68,18 +66,6 @@ class WeeklyDuplicationService
       start_date: @source_week.end_date ? @source_week.end_date + 1 : nil,
       end_date: @source_week.end_date ? @source_week.end_date + 7 : nil
     )
-  end
-
-  # Dedup: já existe um treino no destino com mesmo nome + mesmo weekday?
-  # Considera o weekday calculado pela `adjusted_day` (não pelo `day` original
-  # da fonte) para que datas pré-ajustadas não confundam a checagem.
-  def existing_treino_in_target?(source_treino, target_week)
-    target_day = adjusted_day(source_treino, target_week)
-    return false if target_day.nil?
-
-    target_week.treinos.where(name: source_treino.name).any? do |t|
-      t.day&.wday == target_day.wday
-    end
   end
 
   def duplicate_treino(treino, new_week)

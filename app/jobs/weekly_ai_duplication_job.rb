@@ -18,13 +18,13 @@ class WeeklyAiDuplicationJob < ApplicationJob
       return
     end
 
-    # Idempotência estrutural: se já existe uma semana posterior com treinos
-    # publicados, a duplicação não tem mais propósito (coach já avançou). Evita
-    # criar weeks extras quando feedbacks atrasados são submetidos.
-    if next_week_already_published?(source_week)
-      Rails.logger.info "[WeeklyAiDuplicationJob] skipping for week ##{source_week_id} — next week already has published treinos"
-      return
-    end
+    # NOTA: o skip anterior (next_week_already_published?) foi removido durante a
+    # extensão da sprint 006. A defesa virou redundante depois que sprint 004
+    # passou a expirar semanas anteriores no submit do feedback (o aluno não
+    # consegue mais responder semana antiga, então a "duplicação tardia" não
+    # acontece). Mantê-lo bloqueava o caso legítimo do coach que já tinha
+    # publicado parte da próxima semana — preferimos sempre duplicar e deixar
+    # o coach ajustar os duplicados.
 
     lock_key = "weekly_ai_dup:#{source_week_id}"
 
@@ -66,20 +66,6 @@ class WeeklyAiDuplicationJob < ApplicationJob
   end
 
   private
-
-  # Verifica se a próxima semana do bloco já existe e possui treinos não-draft.
-  # Quando o coach já publicou a semana seguinte (ou alguém criou semanas
-  # adiante), uma duplicação tardia ia gerar registros inconsistentes ou
-  # semanas extras — exatamente o cenário do bug reportado em sprint 004.
-  def next_week_already_published?(source_week)
-    block = source_week.training_block
-    next_week = block.weeks
-                     .where("week_number > ?", source_week.week_number)
-                     .order(:week_number)
-                     .first
-    return false if next_week.nil?
-    next_week.treinos.where.not(status: :draft).exists?
-  end
 
   def notify_coach(source_week, new_week)
     personal = source_week.training_block.personal

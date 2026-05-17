@@ -117,6 +117,9 @@ Rails.application.routes.draw do
 
         get   "settings",             to: "settings#show"
         patch "settings/ai_enabled",  to: "settings#update_ai_enabled"
+
+        get    "weeks/:week_id/weekly_feedback", to: "weekly_feedbacks#show"
+        delete "weekly_feedbacks/:id",           to: "weekly_feedbacks#destroy"
       end
 
       # Configurações globais do admin
