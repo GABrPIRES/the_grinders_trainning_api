@@ -78,8 +78,43 @@ class GeminiClient
 
     ─── STEP 4 — HARD LIMITS ──────────────────────────────────────────────────────
     • Never propose more than +15% above prescribed_load (backend caps at ±20%).
-    • Round suggested_load to the nearest 0.5 kg.
-    • If computed suggested_load equals prescribed_load, omit that section from output.
+    • The suggested_load must be a REAL-WORLD ACHIEVABLE LOAD with available plates.
+
+    ─── STEP 4.1 — REAL-WORLD PLATE ROUNDING ──────────────────────────────────────
+    Available plates (kg, unlimited quantity): 30, 25, 20, 15, 10, 5, 2.5.
+
+    Detect equipment type from the "equip" field of each section (case-insensitive
+    Portuguese terms):
+      • "Barra olímpica"           → bilateral barbell, 20 kg bar
+      • "Barra W" / "Barra EZ"     → bilateral barbell, 10 kg bar
+      • "Halter" / "Halteres"      → unilateral dumbbell (each hand)
+      • "Polia" / "Máquina" / "Cabo" → cable / machine stack
+      • "Peso corporal" / "Body"   → bodyweight (with optional added load)
+      • anything else              → treat as cable/machine
+
+    Bilateral barbell rules (Barra olímpica, Barra W):
+      • The load must equal bar_weight + 2 × (sum of equal plates per side).
+      • The minimum increment is 5 kg (one 2.5 kg plate on each side).
+      • Valid examples for Barra olímpica (20 kg bar):
+        20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 82.5*, 85, 90, ...
+        (*82.5 valid only with 2.5+2.5 + 30 per side; prefer round 5 kg steps).
+      • Strongly prefer multiples of 5 kg. Use a half-step (2.5) only if it is
+        the only way to honor the goal delta within the ±5% band.
+
+    Dumbbell rules (Halter):
+      • Each dumbbell can be any value in 2.5 kg increments. Half-steps are OK
+        (e.g. 22.5 kg per hand).
+
+    Cable / machine rules (Polia, Máquina):
+      • Increments of 2.5 kg or 5 kg are OK. Prefer 5 kg whenever possible.
+
+    Bodyweight:
+      • If prescribed_load == 0, keep suggested_load = 0 (added load 0).
+      • If prescribed_load > 0 (added weight), use 2.5 kg increments.
+
+    After computing the target load from STEP 3, ROUND to the nearest valid load
+    according to the rules above. When between two valid loads, round DOWN to
+    stay conservative.
 
     ─── STEP 5 — OBSERVATION ──────────────────────────────────────────────────────
     For each treino, write 1–3 sentences in Brazilian Portuguese summarising your
@@ -96,8 +131,9 @@ class GeminiClient
       }
     ]
 
-    - In "sections", include ONLY entries where suggested_load differs from prescribed_load.
-    - Every treino in the input MUST appear in the output (even if "sections" is []).
+    - In "sections", include EVERY section of the treino — even when the suggested_load
+      equals prescribed_load (so the coach always sees a number, never a blank cell).
+    - Every treino in the input MUST appear in the output.
   PROMPT
 
   RESPONSE_SCHEMA = {
