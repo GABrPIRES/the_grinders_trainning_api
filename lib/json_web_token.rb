@@ -8,6 +8,7 @@ module JsonWebToken
       # Carrega a gem JWT no momento exato do uso.
       require 'jwt'
       payload[:exp] = exp.to_i
+      payload[:jti] ||= SecureRandom.uuid
       JWT.encode(payload, SECRET_KEY)
     end
   

@@ -13,6 +13,13 @@ class User < ApplicationRecord
   
     validates :name, presence: true
     validates :email, presence: true, uniqueness: true, format: { with: URI::MailTo::EMAIL_REGEXP }
+    validates :password,
+      length: { minimum: 12, message: "deve ter pelo menos 12 caracteres" },
+      format: {
+        with: /\A(?=.*[A-Z])(?=.*[a-z])(?=.*\d).+\z/,
+        message: "deve conter maiúscula, minúscula e número"
+      },
+      if: -> { password.present? }
   
     has_one :personal, dependent: :destroy
     has_one :aluno, dependent: :destroy
@@ -38,8 +45,17 @@ class User < ApplicationRecord
       update_columns(password_reset_token: nil, password_reset_sent_at: nil)
     end
 
-    def as_json(options = {})
-      super(options.merge(except: [:password_digest]))
+    SENSITIVE_FIELDS = %i[
+      password_digest
+      password_reset_token
+      password_reset_sent_at
+      verification_token
+    ].freeze
+
+    def serializable_hash(options = nil)
+      options ||= {}
+      excepted = SENSITIVE_FIELDS + Array(options[:except])
+      super(options.merge(except: excepted))
     end
 
     private
