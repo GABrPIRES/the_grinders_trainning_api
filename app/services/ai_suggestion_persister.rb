@@ -21,6 +21,9 @@ class AiSuggestionPersister
       new_treino_id = treino_suggestion["treino_id"].to_s
       new_treino = @treino_by_new_id[new_treino_id]
       next unless new_treino
+      # Não sugere cargas em treinos preservados do coach (created_by_ai: false).
+      # O coach mantém autonomia plena nos treinos que criou manualmente.
+      next unless new_treino.created_by_ai
 
       # Salva a observação da IA no treino duplicado (exibida ao coach na revisão).
       observation = treino_suggestion["observation"].presence

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_05_13_191205) do
+ActiveRecord::Schema[8.0].define(version: 2026_05_14_133656) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -20,6 +20,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_05_13_191205) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.boolean "push_enabled", default: false, null: false
+    t.boolean "ai_enabled_global", default: true, null: false
   end
 
   create_table "ai_load_suggestions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -145,6 +146,9 @@ ActiveRecord::Schema[8.0].define(version: 2026_05_13_191205) do
     t.boolean "email_on_workout_completed", default: true, null: false
     t.boolean "email_on_workout_missed", default: true, null: false
     t.boolean "email_students_on_publish", default: true, null: false
+    t.boolean "ai_enabled_by_admin", default: true, null: false
+    t.boolean "ai_enabled", default: true, null: false
+    t.index ["ai_enabled_by_admin", "ai_enabled"], name: "index_personals_on_ai_enabled_by_admin_and_ai_enabled"
     t.index ["signup_code"], name: "index_personals_on_signup_code", unique: true
     t.index ["user_id"], name: "index_personals_on_user_id"
   end
@@ -335,6 +339,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_05_13_191205) do
     t.datetime "finished_at"
     t.text "ai_observation"
     t.datetime "missed_notified_at"
+    t.boolean "created_by_ai", default: false, null: false
+    t.index ["created_by_ai"], name: "index_treinos_on_created_by_ai"
     t.index ["personal_id"], name: "index_treinos_on_personal_id"
     t.index ["status"], name: "index_treinos_on_status"
     t.index ["week_id"], name: "index_treinos_on_week_id"

@@ -20,13 +20,14 @@ class Api::V1::Admin::SettingsController < ApplicationController
   private
 
   def allowed_params
-    params.require(:settings).permit(:emails_enabled, :push_enabled)
+    params.require(:settings).permit(:emails_enabled, :push_enabled, :ai_enabled_global)
   end
 
   def settings_json
     {
-      emails_enabled: AdminSetting.emails_enabled?,
-      push_enabled:   AdminSetting.push_enabled?
+      emails_enabled:    AdminSetting.emails_enabled?,
+      push_enabled:      AdminSetting.push_enabled?,
+      ai_enabled_global: AdminSetting.ai_enabled_global?
     }
   end
 

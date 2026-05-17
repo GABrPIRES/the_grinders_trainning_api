@@ -1,8 +1,18 @@
 # app/services/weekly_duplication_service.rb
 #
-# Clona a semana atual (treinos + exercicios + sections), cria os novos
-# treinos como draft e retorna o mapeamento de IDs originais → novas sections,
-# necessário para o AiSuggestionPersister.
+# Clona a semana atual (treinos + exercicios + sections) na próxima semana
+# do bloco, **preservando** qualquer treino que o coach já tenha criado
+# manualmente no destino. A dedup acontece por (weekday, name) — se o destino
+# já tem um treino com o mesmo nome no mesmo dia da semana, o do destino é
+# preservado (não duplicamos nem destruímos).
+#
+# Treinos criados aqui são marcados com `created_by_ai: true`, permitindo
+# que o AiSuggestionPersister sugira cargas apenas neles e que futuras
+# rodadas de duplicação distingam o trabalho da IA do trabalho do coach.
+#
+# A data (`day`) é ajustada para a janela start_date..end_date da semana
+# destino — corrige bug observado em sprint 004 onde a IA copiava o day
+# literal da semana fonte.
 class WeeklyDuplicationService
   def initialize(source_week)
     @source_week = source_week
@@ -20,6 +30,10 @@ class WeeklyDuplicationService
       new_week.save! if new_week.new_record?
 
       @source_week.treinos.includes(exercicios: :sections).each do |treino|
+        # Dedup: se destino já tem um treino mesmo nome+weekday, preserva o destino
+        # e não duplica este da origem.
+        next if existing_treino_in_target?(treino, new_week)
+
         new_treino = duplicate_treino(treino, new_week)
         treino_id_map[treino.id.to_s] = new_treino
 
@@ -39,27 +53,15 @@ class WeeklyDuplicationService
 
   private
 
-  # Usa a semana seguinte já existente se estiver vazia ou tiver apenas drafts
-  # (drafts = gerados por rodada anterior do AI, ainda não publicados pelo coach).
-  # Nesse caso, limpa os drafts antigos e reutiliza a semana, preservando
-  # periodization_goal e datas definidas pelo coach.
-  # Caso a semana seguinte já tenha treinos não-draft (publicados/em andamento),
-  # cria uma nova semana após a última existente.
+  # Reutiliza a próxima semana se já existe no bloco; caso contrário, cria.
+  # IMPORTANTE: não destrói mais drafts do destino — agora dedupamos por
+  # (weekday, name) durante a iteração de treinos, preservando trabalho do coach.
   def find_or_build_new_week
     block = @source_week.training_block
     next_number = @source_week.week_number + 1
     candidate = block.weeks.find_by(week_number: next_number)
+    return candidate if candidate
 
-    if candidate
-      has_active_treinos = candidate.treinos.where.not(status: :draft).exists?
-      unless has_active_treinos
-        # Limpa drafts antigos de rodadas anteriores antes de re-duplicar
-        candidate.treinos.where(status: :draft).destroy_all
-        return candidate
-      end
-    end
-
-    # Cria nova semana após a última existente
     last_number = block.weeks.maximum(:week_number) || @source_week.week_number
     block.weeks.build(
       week_number: last_number + 1,
@@ -68,13 +70,46 @@ class WeeklyDuplicationService
     )
   end
 
+  # Dedup: já existe um treino no destino com mesmo nome + mesmo weekday?
+  # Considera o weekday calculado pela `adjusted_day` (não pelo `day` original
+  # da fonte) para que datas pré-ajustadas não confundam a checagem.
+  def existing_treino_in_target?(source_treino, target_week)
+    target_day = adjusted_day(source_treino, target_week)
+    return false if target_day.nil?
+
+    target_week.treinos.where(name: source_treino.name).any? do |t|
+      t.day&.wday == target_day.wday
+    end
+  end
+
   def duplicate_treino(treino, new_week)
     new_week.treinos.create!(
       name: treino.name,
-      day: treino.day,
+      day: adjusted_day(treino, new_week),
       personal_id: treino.personal_id,
-      status: :draft
+      status: :draft,
+      created_by_ai: true
     )
+  end
+
+  # Ajusta a data do treino fonte para a janela [start_date, end_date] da
+  # semana destino, preservando o weekday original. Se o offset cair fora
+  # da janela, força para o weekday correspondente dentro de target_week.
+  def adjusted_day(source_treino, target_week)
+    return nil unless source_treino.day && target_week.start_date
+
+    source_offset = (source_treino.day.to_date - @source_week.start_date).to_i
+    base = target_week.start_date + source_offset.days
+
+    return base if target_week.end_date.nil? || base.between?(target_week.start_date, target_week.end_date)
+
+    # Fallback: encontra dia com o mesmo weekday dentro da janela target.
+    weekday = source_treino.day.wday
+    (0..6).each do |delta|
+      candidate = target_week.start_date + delta.days
+      return candidate if candidate.wday == weekday
+    end
+    base
   end
 
   def duplicate_exercicio(exercicio, new_treino)

@@ -10,6 +10,13 @@ class WeeklyAiDuplicationJob < ApplicationJob
 
   def perform(source_week_id, weekly_feedback_id)
     source_week = Week.includes(treinos: { exercicios: :sections }).find(source_week_id)
+    personal = source_week.training_block.personal
+
+    # Guard de permissões: respeita os 3 flags (admin global + admin per-coach + coach self-opt-out).
+    unless personal.ai_runs?
+      Rails.logger.info "[WeeklyAiDuplicationJob] skipping for week ##{source_week_id} — AI disabled for personal ##{personal.id}"
+      return
+    end
 
     # Idempotência estrutural: se já existe uma semana posterior com treinos
     # publicados, a duplicação não tem mais propósito (coach já avançou). Evita
