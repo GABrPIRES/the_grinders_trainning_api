@@ -32,11 +32,15 @@ env:
     - KAMAL_REGISTRY_PASSWORD
     - SECRET_KEY_BASE
     - RESEND_API_KEY
+    - GEMINI_API_KEY
+    - VAPID_PUBLIC_KEY
+    - VAPID_PRIVATE_KEY
   clear:
     DB_HOST: 68.183.151.132
     SOLID_QUEUE_IN_PUMA: true
     RAILS_LOG_LEVEL: "info"
     FRONTEND_URL: "https://www.thegrinderspowerlifting.com.br"
+    VAPID_MAILTO: "mailto:contato@thegrinderspowerlifting.com.br"
 
 accessories:
   db:
