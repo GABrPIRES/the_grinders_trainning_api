@@ -13,7 +13,10 @@ class Api::V1::WeeklyFeedbacksController < ApplicationController
         pending: true,
         week_id: result[:week_id],
         deadline_at: result[:deadline_at],
-        incomplete_treinos: result[:incomplete_treinos]
+        incomplete_treinos: result[:incomplete_treinos],
+        start_date: result[:start_date],
+        end_date: result[:end_date],
+        date_range_label: result[:date_range_label]
       }
     else
       render json: { pending: false }
@@ -26,6 +29,11 @@ class Api::V1::WeeklyFeedbacksController < ApplicationController
     week = Week.joins(training_block: :aluno)
                .where(training_blocks: { aluno_id: @current_user.aluno.id })
                .find(feedback_params[:week_id])
+
+    if week.feedback_expired?
+      return render json: { error: "Esta semana já foi encerrada e não aceita mais respostas." },
+                    status: :unprocessable_entity
+    end
 
     unless week.feedback_enabled?
       return render json: { error: "O formulário semanal está desativado para esta semana." },
@@ -50,6 +58,11 @@ class Api::V1::WeeklyFeedbacksController < ApplicationController
     )
 
     if feedback.save
+      # Responder a semana mais recente fecha automaticamente a janela das
+      # anteriores ainda pendentes — defesa adicional para casos em que o
+      # hook do publish não foi disparado (ex: importação manual de treinos,
+      # estados inconsistentes históricos).
+      WeekPublishHandler.expire_prior_weeks(week)
       WeeklyAiDuplicationJob.perform_later(week.id, feedback.id)
       render json: { message: "Formulário enviado! A próxima semana será gerada em breve.", id: feedback.id },
              status: :created
@@ -72,6 +85,14 @@ class Api::V1::WeeklyFeedbacksController < ApplicationController
     end
 
     week.update!(snoozed_at: Time.current)
+
+    # Dedup: marca lembretes anteriores da mesma semana como lidos para manter
+    # apenas 1 reminder ativo no dropdown.
+    @current_user.notifications
+                 .where(notification_type: :feedback_form_reminder)
+                 .where("payload->>'week_id' = ?", week.id)
+                 .where(read_at: nil)
+                 .update_all(read_at: Time.current)
 
     @current_user.notifications.create!(
       notification_type: :feedback_form_reminder,

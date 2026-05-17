@@ -55,7 +55,10 @@ class Api::V1::Coach::WeeksController < ApplicationController
     end
 
     # Notifica aluno se todos os treinos da semana foram publicados (incluindo os que já estavam)
-    NotificationService.on_week_published(week: @week, coach_user: @current_user) if approved_ids.any? && @week.treinos.draft.none?
+    if approved_ids.any? && @week.treinos.draft.none?
+      WeekPublishHandler.expire_prior_weeks(@week)
+      NotificationService.on_week_published(week: @week, coach_user: @current_user)
+    end
 
     render json: { message: "#{approved_ids.size} treinos aprovados e publicados.", approved_treino_ids: approved_ids }
   rescue ActiveRecord::RecordInvalid => e
