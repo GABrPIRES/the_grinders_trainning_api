@@ -25,21 +25,24 @@ class Api::V1::Coach::WeeklyFeedbacksController < ApplicationController
   # personal_id). Não toca em weeks.expired_at — regra da sprint 004 preservada: semana
   # já expirada continua expirada (aluno não volta a ver formulário).
   #
-  # Cleanup associado (extensão sprint 006):
-  #   - Remove os treinos created_by_ai:true que ainda estão em :draft na semana
-  #     seguinte. Treinos que o coach já revisou/aprovou (status != draft) ficam
-  #     intactos.
-  #   - Libera o lock cache do job para permitir nova rodada quando o aluno
-  #     responder de novo.
+  # Cleanup associado (extensão sprint 006, refinado na sprint 010):
+  #   - Remove os treinos created_by_ai:true que ainda estão em :draft na new_week
+  #     (target_week_of). Treinos que o coach já promoveu para published/in_progress/
+  #     completed ficam intactos — coach considerou-os "seus".
+  #   - Libera o lock cache do WeeklyAiDuplicationJob para permitir nova rodada
+  #     quando o aluno responder de novo (defesa em profundidade, ai_status já
+  #     garante isso).
+  #   - Tudo em transação: se cleanup falha, feedback não é deletado.
   def destroy
     feedback = WeeklyFeedback.joins(week: { training_block: :personal })
                              .where(training_blocks: { personal_id: @current_user.personal.id })
                              .find(params[:id])
 
     source_week = feedback.week
-    feedback.destroy
-
-    cleanup_ai_artifacts(source_week)
+    ActiveRecord::Base.transaction do
+      feedback.destroy!
+      cleanup_ai_artifacts(source_week)
+    end
 
     render json: { message: "Formulário removido." }
   rescue ActiveRecord::RecordNotFound
@@ -48,22 +51,9 @@ class Api::V1::Coach::WeeklyFeedbacksController < ApplicationController
 
   private
 
-  # Remove os artefatos criados pela IA com base no feedback deletado:
-  # 1. Treinos created_by_ai:true ainda em draft na próxima semana do bloco
-  #    (treinos que o coach já moveu para outro status ficam — significam decisão dele).
-  # 2. Lock cache do WeeklyAiDuplicationJob, para que uma nova resposta do aluno
-  #    re-dispare a IA fresh.
   def cleanup_ai_artifacts(source_week)
-    block = source_week.training_block
-    next_week = block.weeks
-                     .where("week_number > ?", source_week.week_number)
-                     .order(:week_number)
-                     .first
-
-    if next_week
-      next_week.treinos.where(created_by_ai: true, status: :draft).destroy_all
-    end
-
+    target_week = WeeklyDuplicationService.target_week_of(source_week)
+    target_week&.treinos&.where(created_by_ai: true, status: :draft)&.destroy_all
     Rails.cache.delete("weekly_ai_dup:#{source_week.id}")
   end
 
