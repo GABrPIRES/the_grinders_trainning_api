@@ -1,18 +1,24 @@
 # app/services/weekly_duplication_service.rb
 #
 # Clona a semana atual (treinos + exercicios + sections) na próxima semana
-# do bloco, **preservando** qualquer treino que o coach já tenha criado
-# manualmente no destino. A dedup acontece por (weekday, name) — se o destino
-# já tem um treino com o mesmo nome no mesmo dia da semana, o do destino é
-# preservado (não duplicamos nem destruímos).
+# do bloco.
 #
-# Treinos criados aqui são marcados com `created_by_ai: true`, permitindo
+# Idempotência (sprint 010): se `new_week` já tem treinos com `created_by_ai: true`
+# (1ª execução do job completou a duplicação), reconstrói treino_id_map e
+# section_id_map a partir dos treinos existentes em vez de criar novos. Isso
+# permite que o retry do WeeklyAiDuplicationJob (após GeminiClient::GeminiError)
+# chame Gemini sobre os treinos do 1º run em vez de duplicá-los lado a lado.
+#
+# Bug de produção corrigido: log 2026-05-22 19:44 mostrou 2 conjuntos de
+# TREINO 1/2/3 com mesmo name+day e ~6s de diferença em created_at —
+# resultado do retry do ActiveJob criando outra rodada inteira.
+#
+# Treinos criados aqui ficam marcados com `created_by_ai: true`, permitindo
 # que o AiSuggestionPersister sugira cargas apenas neles e que futuras
-# rodadas de duplicação distingam o trabalho da IA do trabalho do coach.
+# rodadas distingam o trabalho da IA do trabalho do coach.
 #
 # A data (`day`) é ajustada para a janela start_date..end_date da semana
-# destino — corrige bug observado em sprint 004 onde a IA copiava o day
-# literal da semana fonte.
+# destino.
 class WeeklyDuplicationService
   def initialize(source_week)
     @source_week = source_week
@@ -28,6 +34,12 @@ class WeeklyDuplicationService
     ActiveRecord::Base.transaction do
       new_week = find_or_build_new_week
       new_week.save! if new_week.new_record?
+
+      # Idempotência verdadeira: retry encontra os treinos do 1º run e
+      # reusa os IDs sem criar duplicatas.
+      if new_week.treinos.where(created_by_ai: true).exists?
+        return build_maps_from_existing(new_week)
+      end
 
       @source_week.treinos.includes(exercicios: :sections).each do |treino|
         new_treino = duplicate_treino(treino, new_week)
@@ -47,13 +59,54 @@ class WeeklyDuplicationService
     { new_week: new_week, section_id_map: section_id_map, treino_id_map: treino_id_map }
   end
 
+  # Helper estático usado por Coach::WeeklyFeedbacksController#destroy
+  # (sprint 010) para localizar a próxima semana sem reexecutar a lógica
+  # de criação.
+  def self.target_week_of(source_week)
+    block = source_week.training_block
+    block.weeks.find_by(week_number: source_week.week_number + 1)
+  end
+
   private
 
+  # Reconstrói treino_id_map e section_id_map a partir dos treinos
+  # `created_by_ai: true` já presentes na new_week (1º run do job). Pareia
+  # source ↔ target por (name, adjusted_day). Para exercícios usa name como
+  # match primário e index posicional como fallback. Para sections usa
+  # index posicional dentro do exercício casado.
+  def build_maps_from_existing(new_week)
+    treino_id_map = {}
+    section_id_map = {}
+    existing = new_week.treinos.where(created_by_ai: true).includes(exercicios: :sections).to_a
+
+    @source_week.treinos.includes(exercicios: :sections).each do |src_treino|
+      target_day = adjusted_day(src_treino, new_week)
+      matched_treino = existing.find do |t|
+        t.name == src_treino.name && t.day&.to_date == target_day&.to_date
+      end
+      next unless matched_treino
+      treino_id_map[src_treino.id.to_s] = matched_treino
+
+      src_exercicios = src_treino.exercicios.to_a
+      target_exercicios = matched_treino.exercicios.to_a
+
+      src_exercicios.each_with_index do |src_ex, ex_idx|
+        matched_ex = target_exercicios.find { |e| e.name == src_ex.name } ||
+                     target_exercicios[ex_idx]
+        next unless matched_ex
+
+        target_sections = matched_ex.sections.to_a
+        src_ex.sections.each_with_index do |src_sec, sec_idx|
+          matched_sec = target_sections[sec_idx]
+          section_id_map[src_sec.id.to_s] = matched_sec if matched_sec
+        end
+      end
+    end
+
+    { new_week: new_week, section_id_map: section_id_map, treino_id_map: treino_id_map }
+  end
+
   # Reutiliza a próxima semana se já existe no bloco; caso contrário, cria.
-  # IMPORTANTE: não destrói mais drafts do destino (mudança da sprint 005) e
-  # também não dedupa por (weekday, name) — todos os treinos da source são
-  # duplicados, mesmo que já exista treino do coach no mesmo dia (extensão
-  # sprint 006). Coach decide o que manter na revisão.
   def find_or_build_new_week
     block = @source_week.training_block
     next_number = @source_week.week_number + 1
@@ -102,6 +155,7 @@ class WeeklyDuplicationService
     new_treino.exercicios.create!(
       name: exercicio.name
       # observation starts nil — fresh week, fresh notes
+      # position é setado pelo before_validation callback do model (Fase 3)
     )
   end
 

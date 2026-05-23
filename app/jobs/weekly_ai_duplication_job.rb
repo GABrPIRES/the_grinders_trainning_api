@@ -2,7 +2,12 @@
 #
 # Orquestra a clonagem da semana e a chamada ao Gemini.
 # Deve ser enfileirado após a submissão do weekly_feedback.
-# Protegido contra double-run via Rails.cache lock (SolidCache).
+#
+# Defesa em profundidade contra double-runs:
+#   1. WeeklyFeedback#ai_status (sprint 010) — guard de re-entrância entre tentativas.
+#   2. Rails.cache lock (SolidCache) — defesa curta dentro da mesma janela de 1h.
+#   3. WeeklyDuplicationService.duplicate! — idempotência verdadeira (reconstrói
+#      maps a partir dos treinos existentes em retry).
 class WeeklyAiDuplicationJob < ApplicationJob
   queue_as :ai_processing
 
@@ -11,6 +16,7 @@ class WeeklyAiDuplicationJob < ApplicationJob
   def perform(source_week_id, weekly_feedback_id)
     source_week = Week.includes(treinos: { exercicios: :sections }).find(source_week_id)
     personal = source_week.training_block.personal
+    feedback = WeeklyFeedback.find(weekly_feedback_id)
 
     # Guard de permissões: respeita os 3 flags (admin global + admin per-coach + coach self-opt-out).
     unless personal.ai_runs?
@@ -18,34 +24,33 @@ class WeeklyAiDuplicationJob < ApplicationJob
       return
     end
 
-    # NOTA: o skip anterior (next_week_already_published?) foi removido durante a
-    # extensão da sprint 006. A defesa virou redundante depois que sprint 004
-    # passou a expirar semanas anteriores no submit do feedback (o aluno não
-    # consegue mais responder semana antiga, então a "duplicação tardia" não
-    # acontece). Mantê-lo bloqueava o caso legítimo do coach que já tinha
-    # publicado parte da próxima semana — preferimos sempre duplicar e deixar
-    # o coach ajustar os duplicados.
+    # Guard de re-entrância via ai_status: previne 2º run cobrir o trabalho do 1º.
+    # :failed continua passando (caso retry_on do ActiveJob ou retry manual da
+    # sprint 011 — neste caso a idempotência do service garante que nenhum treino
+    # duplicado é criado).
+    if feedback.ai_processing? || feedback.ai_completed?
+      Rails.logger.info "[WeeklyAiDuplicationJob] skipping — feedback ##{feedback.id} already #{feedback.ai_status}"
+      return
+    end
 
     lock_key = "weekly_ai_dup:#{source_week_id}"
 
-    # Idempotency guard de curto prazo: protege contra reenfileiramentos do
-    # mesmo job dentro de 1h (double-run por retry/concorrência).
+    # Lock de curto prazo: protege contra reenfileiramentos do mesmo job dentro
+    # de 1h (race de concorrência). Liberado em rescue para permitir retry.
     acquired = Rails.cache.write(lock_key, true, expires_in: 1.hour, unless_exist: true)
     return unless acquired
 
-    weekly_feedback = WeeklyFeedback.find(weekly_feedback_id)
+    feedback.update!(ai_status: :processing, ai_error_message: nil)
 
-    # 1. Clonar a semana.
+    # 1. Clonar a semana (idempotente: reusa se já há treinos created_by_ai).
     result = WeeklyDuplicationService.new(source_week).duplicate!
     new_week = result[:new_week]
     section_id_map = result[:section_id_map]
+    treino_id_map = result[:treino_id_map]
 
     # 2. Construir payload otimizado para o Gemini.
-    # Usa o periodization_goal da NOVA semana (objetivo definido pelo coach para a próxima semana),
-    # não da semana concluída. Fallback para "maintenance" se não definido.
-    treino_id_map = result[:treino_id_map]
     payload_json = AiLoadPayloadBuilder.new(
-      source_week, weekly_feedback, treino_id_map,
+      source_week, feedback, treino_id_map,
       target_goal: new_week.periodization_goal
     ).build
 
@@ -55,13 +60,22 @@ class WeeklyAiDuplicationJob < ApplicationJob
     # 4. Persistir sugestões com guardrail de 20%.
     AiSuggestionPersister.new(suggestions, section_id_map, treino_id_map).persist!
 
-    # 5. Notificar o coach que há uma semana aguardando revisão.
+    # 5. Marcar como completed e notificar o coach.
+    feedback.update!(ai_status: :completed)
     notify_coach(source_week, new_week)
   rescue ActiveRecord::RecordNotFound => e
     Rails.logger.error "[WeeklyAiDuplicationJob] Record not found: #{e.message}"
-    Rails.cache.delete(lock_key) # libera lock se o registro não existe
+    Rails.cache.delete(lock_key) if defined?(lock_key)
   rescue => e
-    Rails.cache.delete(lock_key) # libera lock para permitir retry
+    Rails.cache.delete(lock_key) if defined?(lock_key)
+    # update_columns para evitar callbacks/validações em meio a rescue.
+    if defined?(feedback) && feedback.present?
+      feedback.update_columns(
+        ai_status: WeeklyFeedback.ai_statuses[:failed],
+        ai_error_message: e.message.to_s.first(500),
+        updated_at: Time.current
+      )
+    end
     raise
   end
 
