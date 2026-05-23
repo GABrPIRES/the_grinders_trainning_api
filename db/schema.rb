@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_05_23_144813) do
+ActiveRecord::Schema[8.0].define(version: 2026_05_23_145949) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -79,6 +79,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_05_23_144813) do
     t.text "observation"
     t.text "coach_comment"
     t.text "video_link"
+    t.integer "position", default: 0, null: false
+    t.index ["treino_id", "position"], name: "index_exercicios_on_treino_id_and_position"
     t.index ["treino_id"], name: "index_exercicios_on_treino_id"
   end
 
