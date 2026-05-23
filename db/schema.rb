@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_05_14_133656) do
+ActiveRecord::Schema[8.0].define(version: 2026_05_23_144813) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -374,6 +374,9 @@ ActiveRecord::Schema[8.0].define(version: 2026_05_14_133656) do
     t.text "general_evaluation"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "ai_status", default: 0, null: false
+    t.text "ai_error_message"
+    t.index ["ai_status"], name: "index_weekly_feedbacks_on_ai_status"
     t.index ["aluno_id"], name: "index_weekly_feedbacks_on_aluno_id"
     t.index ["week_id", "aluno_id"], name: "index_weekly_feedbacks_on_week_id_and_aluno_id", unique: true
     t.index ["week_id"], name: "index_weekly_feedbacks_on_week_id"
