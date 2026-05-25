@@ -8,6 +8,13 @@ class Personal < ApplicationRecord
   has_many :pagamentos, dependent: :destroy
   has_many :exercise_models, foreign_key: 'coach_id', dependent: :destroy
 
+  # Como a IA deve duplicar a semana ao receber o feedback do aluno:
+  #   - preserve (default): duplica source.treinos sem mexer no que já existe
+  #     na target_week (drafts manuais do coach são preservados lado a lado).
+  #   - destructive: apaga TODOS os treinos da target_week antes de duplicar.
+  # Prefix evita conflito com possíveis futuros enums de "mode".
+  enum :ai_duplication_mode, { preserve: 0, destructive: 1 }, prefix: :duplication_mode
+
   # IA de auto-regulação de cargas roda para este coach apenas se as três flags
   # estão habilitadas:
   #   - admin ativou IA globalmente (AdminSetting.ai_enabled_global)

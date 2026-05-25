@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_05_23_145949) do
+ActiveRecord::Schema[8.0].define(version: 2026_05_25_210819) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -150,6 +150,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_05_23_145949) do
     t.boolean "email_students_on_publish", default: true, null: false
     t.boolean "ai_enabled_by_admin", default: true, null: false
     t.boolean "ai_enabled", default: true, null: false
+    t.integer "ai_duplication_mode", default: 0, null: false
+    t.index ["ai_duplication_mode"], name: "index_personals_on_ai_duplication_mode"
     t.index ["ai_enabled_by_admin", "ai_enabled"], name: "index_personals_on_ai_enabled_by_admin_and_ai_enabled"
     t.index ["signup_code"], name: "index_personals_on_signup_code", unique: true
     t.index ["user_id"], name: "index_personals_on_user_id"
