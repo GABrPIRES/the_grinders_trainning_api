@@ -120,8 +120,9 @@ Rails.application.routes.draw do
       namespace :coach do
         resource :notification_preferences, only: [:show, :update], controller: :notification_preferences
 
-        get   "settings",             to: "settings#show"
-        patch "settings/ai_enabled",  to: "settings#update_ai_enabled"
+        get   "settings",                        to: "settings#show"
+        patch "settings/ai_enabled",             to: "settings#update_ai_enabled"
+        patch "settings/ai_duplication_mode",    to: "settings#update_ai_duplication_mode"
 
         get    "weeks/:week_id/weekly_feedback", to: "weekly_feedbacks#show"
         delete "weekly_feedbacks/:id",           to: "weekly_feedbacks#destroy"
