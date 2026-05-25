@@ -36,9 +36,18 @@ class WeeklyDuplicationService
       new_week.save! if new_week.new_record?
 
       # Idempotência verdadeira: retry encontra os treinos do 1º run e
-      # reusa os IDs sem criar duplicatas.
+      # reusa os IDs sem criar duplicatas. Tem precedência sobre o modo
+      # destructive — se já há treinos created_by_ai, é retry e NÃO
+      # apagamos o trabalho que o coach pode ter feito após a 1ª rodada.
       if new_week.treinos.where(created_by_ai: true).exists?
         return build_maps_from_existing(new_week)
+      end
+
+      # Modo destructive (sprint 011): apaga todos os treinos da target_week
+      # antes da 1ª duplicação. Coach foi avisado via UI que esse modo
+      # apaga tudo (inclusive drafts manuais).
+      if personal_duplication_mode == :destructive
+        new_week.treinos.destroy_all
       end
 
       @source_week.treinos.includes(exercicios: :sections).each do |treino|
@@ -68,6 +77,14 @@ class WeeklyDuplicationService
   end
 
   private
+
+  # Lê fresh do banco para evitar valor cached em associations reaproveitadas
+  # entre chamadas (cenários de teste, jobs com retry herdando instâncias, etc.).
+  # pick devolve a string do enum em Rails 8 (não o integer raw).
+  def personal_duplication_mode
+    personal_id = @source_week.training_block.personal_id
+    Personal.where(id: personal_id).pick(:ai_duplication_mode).to_s.to_sym
+  end
 
   # Reconstrói treino_id_map e section_id_map a partir dos treinos
   # `created_by_ai: true` já presentes na new_week (1º run do job). Pareia
