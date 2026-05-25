@@ -125,6 +125,7 @@ Rails.application.routes.draw do
 
         get    "weeks/:week_id/weekly_feedback", to: "weekly_feedbacks#show"
         delete "weekly_feedbacks/:id",           to: "weekly_feedbacks#destroy"
+        post   "weekly_feedbacks/:id/retry_ai",  to: "weekly_feedbacks#retry_ai"
       end
 
       # Configurações globais do admin

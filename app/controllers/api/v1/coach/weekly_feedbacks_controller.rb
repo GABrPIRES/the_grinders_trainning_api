@@ -49,6 +49,33 @@ class Api::V1::Coach::WeeklyFeedbacksController < ApplicationController
     render json: { error: "Formulário não encontrado ou acesso negado." }, status: :not_found
   end
 
+  # POST /api/v1/coach/weekly_feedbacks/:id/retry_ai
+  # Re-enfileira o WeeklyAiDuplicationJob para um feedback que falhou. Só é
+  # permitido quando ai_status == :failed — para reprocessar um OK, o coach
+  # deve apagar o formulário (que limpa os artefatos) e pedir ao aluno
+  # responder novamente.
+  def retry_ai
+    feedback = WeeklyFeedback.joins(week: { training_block: :personal })
+                             .where(training_blocks: { personal_id: @current_user.personal.id })
+                             .find(params[:id])
+
+    unless feedback.ai_failed?
+      render json: {
+        error: "Retry só é permitido após falha (status atual: #{feedback.ai_status}). " \
+               "Para reprocessar um feedback OK, apague o formulário e peça ao aluno responder novamente."
+      }, status: :unprocessable_entity
+      return
+    end
+
+    feedback.update!(ai_status: :pending, ai_error_message: nil)
+    Rails.cache.delete("weekly_ai_dup:#{feedback.week_id}")
+    WeeklyAiDuplicationJob.perform_later(feedback.week_id, feedback.id)
+
+    render json: { ai_status: feedback.ai_status }
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: "Formulário não encontrado ou acesso negado." }, status: :not_found
+  end
+
   private
 
   def cleanup_ai_artifacts(source_week)
