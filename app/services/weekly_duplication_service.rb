@@ -153,9 +153,9 @@ class WeeklyDuplicationService
 
   def duplicate_exercicio(exercicio, new_treino)
     new_treino.exercicios.create!(
-      name: exercicio.name
+      name: exercicio.name,
+      position: exercicio.position
       # observation starts nil — fresh week, fresh notes
-      # position é setado pelo before_validation callback do model (Fase 3)
     )
   end
 

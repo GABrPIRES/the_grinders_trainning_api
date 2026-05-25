@@ -3,7 +3,7 @@ class Treino < ApplicationRecord
   belongs_to :week
   belongs_to :personal
 
-  has_many :exercicios, dependent: :destroy
+  has_many :exercicios, -> { order(:position, :created_at) }, dependent: :destroy
   has_many :sections, through: :exercicios
   has_many :ai_load_suggestions, through: :sections
 

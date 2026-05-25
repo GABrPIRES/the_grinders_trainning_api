@@ -93,9 +93,12 @@ class Api::V1::TreinosController < ApplicationController
 
       new_treino.save!
 
-      # 3. Copia Exercícios e Sections
+      # 3. Copia Exercícios e Sections (preserva position do source)
       @treino.exercicios.includes(:sections).each do |source_exercicio|
-        new_exercicio = new_treino.exercicios.create!(name: source_exercicio.name)
+        new_exercicio = new_treino.exercicios.create!(
+          name: source_exercicio.name,
+          position: source_exercicio.position
+        )
 
         source_exercicio.sections.each do |source_section|
           # Copia atributos da section ignorando IDs

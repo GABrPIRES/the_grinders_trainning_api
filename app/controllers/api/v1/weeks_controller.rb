@@ -77,9 +77,12 @@ class Api::V1::WeeksController < ApplicationController
           personal_id: @current_user.personal.id # Se sua tabela ainda usa isso
         )
 
-        # Copia Exercícios e Séries
-        source_treino.exercicios.order(:created_at).each do |source_ex|
-          new_ex = new_treino.exercicios.create!(name: source_ex.name)
+        # Copia Exercícios e Séries (preserva position do source)
+        source_treino.exercicios.order(:position, :created_at).each do |source_ex|
+          new_ex = new_treino.exercicios.create!(
+            name: source_ex.name,
+            position: source_ex.position
+          )
 
           source_ex.sections.order(:created_at).each do |sec|
             new_ex.sections.create!(

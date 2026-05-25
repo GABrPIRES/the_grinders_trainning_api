@@ -62,8 +62,11 @@ class Api::V1::TrainingBlocksController < ApplicationController
             status: :draft
           )
 
-          source_treino.exercicios.includes(:sections).each do |source_ex|
-            new_ex = new_treino.exercicios.create!(name: source_ex.name)
+          source_treino.exercicios.includes(:sections).order(:position, :created_at).each do |source_ex|
+            new_ex = new_treino.exercicios.create!(
+              name: source_ex.name,
+              position: source_ex.position
+            )
 
             source_ex.sections.each do |sec|
               attrs = sec.attributes.except("id", "exercicio_id", "created_at", "updated_at")
