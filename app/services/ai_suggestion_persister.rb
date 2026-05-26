@@ -1,19 +1,24 @@
 # app/services/ai_suggestion_persister.rb
 #
-# Recebe o output do Gemini (agrupado por treino), aplica o guardrail de 20%
+# Recebe o output do Gemini (agrupado por treino), aplica o guardrail de
+# critical_delta_pct (default 20%, override via AdminSetting/Personal — sprint 012)
 # e persiste as sugestões. Salva também a observação da IA em cada treino.
 class AiSuggestionPersister
-  CRITICAL_DELTA_THRESHOLD = 0.20
+  # Default em porcentagem (ex: 20.0 = 20%). Convertido para fração no
+  # constructor. Constante exposta para o AiConfigResolver fazer o fallback.
+  DEFAULT_CRITICAL_DELTA_PCT = 20.0
 
-  def initialize(suggestions_json, section_id_map, treino_id_map)
-    # suggestions_json: array de { "treino_id" => uuid_new, "observation" => text,
-    #                               "sections" => [{"section_id"=>uuid_old, "suggested_load"=>float}] }
-    # section_id_map: { original_section_id_string => new_section }
-    # treino_id_map: { original_treino_id_string => new_treino } — used to find treino by new id
+  # suggestions_json: array de { "treino_id" => uuid_new, "observation" => text,
+  #                               "sections" => [{"section_id"=>uuid_old, "suggested_load"=>float}] }
+  # section_id_map: { original_section_id_string => new_section }
+  # treino_id_map: { original_treino_id_string => new_treino }
+  # critical_threshold: porcentagem (ex: 20.0 = 20%) — sprint 012 permite admin
+  # ou coach customizar. Default cai no DEFAULT_CRITICAL_DELTA_PCT.
+  def initialize(suggestions_json, section_id_map, treino_id_map, critical_threshold: DEFAULT_CRITICAL_DELTA_PCT)
     @suggestions = suggestions_json
     @section_map = section_id_map
-    # Build reverse map: new_treino_id => new_treino
     @treino_by_new_id = treino_id_map.values.index_by { |t| t.id.to_s }
+    @critical_threshold_fraction = critical_threshold.to_f / 100.0
   end
 
   def persist!
@@ -57,6 +62,6 @@ class AiSuggestionPersister
     return false if prescribed.zero?
 
     delta = (suggested - prescribed).abs / prescribed
-    delta > CRITICAL_DELTA_THRESHOLD
+    delta > @critical_threshold_fraction
   end
 end

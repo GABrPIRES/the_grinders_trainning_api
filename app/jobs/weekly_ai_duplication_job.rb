@@ -48,17 +48,24 @@ class WeeklyAiDuplicationJob < ApplicationJob
     section_id_map = result[:section_id_map]
     treino_id_map = result[:treino_id_map]
 
+    # Sprint 012: resolve prompt + 4 parâmetros guardrail (personal → admin → default).
+    config = AiConfigResolver.for(personal)
+    prompt = AiConfigResolver.interpolate(config[:system_prompt], config)
+
     # 2. Construir payload otimizado para o Gemini.
     payload_json = AiLoadPayloadBuilder.new(
       source_week, feedback, treino_id_map,
       target_goal: new_week.periodization_goal
     ).build
 
-    # 3. Chamar o Gemini.
-    suggestions = GeminiClient.generate_load_suggestions(payload_json)
+    # 3. Chamar o Gemini com o prompt resolvido.
+    suggestions = GeminiClient.generate_load_suggestions(payload_json, system_prompt: prompt)
 
-    # 4. Persistir sugestões com guardrail de 20%.
-    AiSuggestionPersister.new(suggestions, section_id_map, treino_id_map).persist!
+    # 4. Persistir sugestões com guardrail configurável (default 20%).
+    AiSuggestionPersister.new(
+      suggestions, section_id_map, treino_id_map,
+      critical_threshold: config[:critical_delta_pct]
+    ).persist!
 
     # 5. Marcar como completed e notificar o coach.
     feedback.update!(ai_status: :completed)

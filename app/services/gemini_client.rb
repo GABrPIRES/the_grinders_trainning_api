@@ -6,7 +6,16 @@ class GeminiClient
   MODEL = "gemini-2.5-flash".freeze
   BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/#{MODEL}:generateContent".freeze
 
-  SYSTEM_PROMPT = <<~PROMPT.strip
+  # Defaults hard-coded (fallback quando admin e personal não setaram via
+  # /admin/ai-config ou /coach/ai_config — sprint 012).
+  DEFAULT_MAX_LOAD_INCREASE_PCT = 15.0
+  DEFAULT_SLEEP_THRESHOLD       = 4
+  DEFAULT_STRESS_THRESHOLD      = 8
+
+  # Prompt default. Placeholders `{{max_load_increase_pct}}`,
+  # `{{critical_delta_pct}}`, `{{sleep_threshold}}` e `{{stress_threshold}}`
+  # são substituídos pelo AiConfigResolver.interpolate antes de enviar.
+  DEFAULT_SYSTEM_PROMPT = <<~PROMPT.strip
     You are an expert powerlifting coach assistant. Your job is to propose load
     adjustments for the next training week and write a brief coach-facing summary
     for each training session (treino).
@@ -28,7 +37,7 @@ class GeminiClient
     This override takes precedence over all rules below.
 
     ─── STEP 1 — GLOBAL CONSERVATISM ─────────────────────────────────────────────
-    If sleep_level ≤ 4 OR stress_level ≥ 8: reduce your default adjustment delta
+    If sleep_level ≤ {{sleep_threshold}} OR stress_level ≥ {{stress_threshold}}: reduce your default adjustment delta
     by half for all exercises (unless safety override already applies).
 
     ─── STEP 2 — RESOLVE EFFECTIVE VALUES PER SECTION ────────────────────────────
@@ -77,7 +86,7 @@ class GeminiClient
               load (overload) or reduce slightly more (deload).
 
     ─── STEP 4 — HARD LIMITS ──────────────────────────────────────────────────────
-    • Never propose more than +15% above prescribed_load (backend caps at ±20%).
+    • Never propose more than +{{max_load_increase_pct}}% above prescribed_load (backend caps at ±{{critical_delta_pct}}%).
     • The suggested_load must be a REAL-WORLD ACHIEVABLE LOAD with available plates.
 
     ─── STEP 4.1 — REAL-WORLD PLATE ROUNDING ──────────────────────────────────────
@@ -159,14 +168,15 @@ class GeminiClient
     }
   }.freeze
 
-  def self.generate_load_suggestions(payload_json)
-    new.generate_load_suggestions(payload_json)
+  def self.generate_load_suggestions(payload_json, system_prompt: nil)
+    new.generate_load_suggestions(payload_json, system_prompt: system_prompt)
   end
 
-  def generate_load_suggestions(payload_json)
+  def generate_load_suggestions(payload_json, system_prompt: nil)
+    prompt = system_prompt.presence || DEFAULT_SYSTEM_PROMPT
     body = {
       system_instruction: {
-        parts: [ { text: SYSTEM_PROMPT } ]
+        parts: [ { text: prompt } ]
       },
       contents: [
         {
