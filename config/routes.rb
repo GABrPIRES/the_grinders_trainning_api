@@ -133,6 +133,9 @@ Rails.application.routes.draw do
       namespace :admin do
         resource :settings, only: [:show, :update], controller: :settings
         resources :ai_permissions, only: [:index, :update], param: :personal_id
+        get   "ai_config",                  to: "ai_configs#show"
+        patch "ai_config",                  to: "ai_configs#update"
+        post  "ai_config/reset_to_default", to: "ai_configs#reset_to_default"
       end
 
       # Dashboard do coach: revisão e aprovação de sugestões da IA
