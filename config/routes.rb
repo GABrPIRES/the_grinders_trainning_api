@@ -124,6 +124,10 @@ Rails.application.routes.draw do
         patch "settings/ai_enabled",             to: "settings#update_ai_enabled"
         patch "settings/ai_duplication_mode",    to: "settings#update_ai_duplication_mode"
 
+        get   "ai_config",                       to: "ai_configs#show"
+        patch "ai_config",                       to: "ai_configs#update"
+        post  "ai_config/reset_to_default",      to: "ai_configs#reset_to_default"
+
         get    "weeks/:week_id/weekly_feedback", to: "weekly_feedbacks#show"
         delete "weekly_feedbacks/:id",           to: "weekly_feedbacks#destroy"
         post   "weekly_feedbacks/:id/retry_ai",  to: "weekly_feedbacks#retry_ai"
