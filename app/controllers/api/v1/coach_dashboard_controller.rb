@@ -40,6 +40,12 @@ class Api::V1::CoachDashboardController < ApplicationController
                                                .where(treinos: { personal_id: @personal.id })
                                                .count
 
+    # 5b. Status agregado dos feedbacks dos alunos deste coach (sprint 011)
+    feedbacks_scope = WeeklyFeedback.joins(week: { training_block: :personal })
+                                    .where(personals: { id: @personal.id })
+    ai_processing_count = feedbacks_scope.where(ai_status: WeeklyFeedback.ai_statuses[:processing]).count
+    ai_failed_count     = feedbacks_scope.where(ai_status: WeeklyFeedback.ai_statuses[:failed]).count
+
     # 6. Dados para o gráfico conforme período solicitado
     start_date = period.days.ago.beginning_of_day
     pagamentos_period = @personal.pagamentos
@@ -74,6 +80,8 @@ class Api::V1::CoachDashboardController < ApplicationController
       total_students_count:         total_students_count,
       overdue_payments_count:       overdue_payments_count,
       pending_ai_reviews_count:     pending_ai_reviews_count,
+      ai_processing_count:          ai_processing_count,
+      ai_failed_count:              ai_failed_count,
       revenue_chart_data:           revenue_chart_data
     }
   end

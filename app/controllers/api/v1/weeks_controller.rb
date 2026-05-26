@@ -33,7 +33,20 @@ class Api::V1::WeeksController < ApplicationController
         has_ai_observation: treino.ai_observation.present?
       )
     end
-    render json: @week.as_json.merge(treinos: treinos_data, feedback_enabled: @week.feedback_enabled)
+
+    # Status da IA que rodou para gerar esta semana (sprint 011).
+    # Lê o feedback da semana ANTERIOR, que é o gatilho da duplicação.
+    prev_feedback = previous_week_feedback_for(@week)
+
+    render json: @week.as_json.merge(
+      treinos: treinos_data,
+      feedback_enabled: @week.feedback_enabled,
+      previous_week_feedback: prev_feedback && {
+        id: prev_feedback.id,
+        ai_status: prev_feedback.ai_status,
+        ai_error_message: prev_feedback.ai_error_message
+      }
+    )
   end
 
   # POST /api/v1/weeks/:id/duplicate
@@ -145,5 +158,15 @@ class Api::V1::WeeksController < ApplicationController
   def authorize_coach!
     return if @current_user.personal?
     render json: { error: "Acesso restrito a coaches." }, status: :forbidden
+  end
+
+  # Feedback da semana anterior do mesmo bloco (gatilho da duplicação que
+  # produziu esta semana). Pode ser nil se for week_number 1 ou se o aluno
+  # ainda não respondeu.
+  def previous_week_feedback_for(week)
+    block = week.training_block
+    prev_week = block.weeks.find_by(week_number: week.week_number - 1)
+    return nil unless prev_week
+    WeeklyFeedback.find_by(week_id: prev_week.id, aluno_id: block.aluno_id)
   end
 end
