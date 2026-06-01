@@ -127,10 +127,10 @@ class Api::V1::Coach::WeeksController < ApplicationController
         suggestion_status: suggestion&.status,
         critical: suggestion&.critical || false,
         # Contexto da semana anterior (o que o aluno fez):
-        previous_prescribed_load: source_section&.carga,
-        previous_prescribed_rpe:  source_section&.rpe,
-        previous_actual_load:     source_section&.actual_load,
-        previous_actual_rpe:      source_section&.actual_rpe,
+        previous_prescribed_load: source_section&.carga&.round(2),
+        previous_prescribed_rpe:  source_section&.rpe&.round(1),
+        previous_actual_load:     source_section&.actual_load&.round(2),
+        previous_actual_rpe:      source_section&.actual_rpe&.round(1),
         previous_feito:           source_section&.feito
       }
     end

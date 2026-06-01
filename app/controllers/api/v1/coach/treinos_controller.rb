@@ -35,15 +35,17 @@ class Api::V1::Coach::TreinosController < ApplicationController
   end
 
   # GET /api/v1/coach/treinos/:id/review
-  # Retorna o treino em draft com sugestões da IA por section e a observação geral.
+  # Retorna o treino em draft com sugestões da IA por section e a observação geral,
+  # PLUS contexto da semana anterior (o que o aluno fez de verdade no treino fonte).
   def review
+    source_treino = previous_week_treino_of(@treino)
     render json: {
       treino_id: @treino.id,
       treino_name: @treino.name,
       treino_day: @treino.day,
       status: @treino.status,
       ai_observation: @treino.ai_observation,
-      exercicios: build_exercicios_diff
+      exercicios: build_exercicios_diff(source_treino)
     }
   end
 
@@ -110,19 +112,33 @@ class Api::V1::Coach::TreinosController < ApplicationController
     end
   end
 
-  def build_exercicios_diff
-    @treino.exercicios.includes(sections: :ai_load_suggestions).map do |exercicio|
+  # Treino correspondente na semana anterior (mesmo bloco, mesmo name).
+  # Usado para puxar previous_observation e previous_actual_* no review.
+  def previous_week_treino_of(treino)
+    week = treino.week
+    prev_week = week.training_block.weeks.find_by(week_number: week.week_number - 1)
+    return nil unless prev_week
+    prev_week.treinos.includes(exercicios: :sections).find_by(name: treino.name)
+  end
+
+  def build_exercicios_diff(source_treino)
+    source_exercicios = source_treino ? source_treino.exercicios.to_a : []
+    @treino.exercicios.includes(sections: :ai_load_suggestions).each_with_index.map do |exercicio, idx|
+      source_ex = source_exercicios.find { |se| se.name == exercicio.name } || source_exercicios[idx]
       {
         exercicio_id: exercicio.id,
         exercicio_name: exercicio.name,
-        sections: build_sections_diff(exercicio)
+        previous_observation: source_ex&.observation,
+        sections: build_sections_diff(exercicio, source_ex)
       }
     end
   end
 
-  def build_sections_diff(exercicio)
-    exercicio.sections.map do |section|
+  def build_sections_diff(exercicio, source_exercicio)
+    source_sections = source_exercicio ? source_exercicio.sections.to_a : []
+    exercicio.sections.each_with_index.map do |section, idx|
       suggestion = section.ai_load_suggestions.order(created_at: :desc).first
+      source_section = source_sections[idx]
       {
         section_id: section.id,
         reps: section.reps,
@@ -132,7 +148,12 @@ class Api::V1::Coach::TreinosController < ApplicationController
         suggested_load: suggestion&.suggested_load,
         suggestion_id: suggestion&.id,
         suggestion_status: suggestion&.status,
-        critical: suggestion&.critical || false
+        critical: suggestion&.critical || false,
+        previous_prescribed_load: source_section&.carga&.round(2),
+        previous_prescribed_rpe:  source_section&.rpe&.round(1),
+        previous_actual_load:     source_section&.actual_load&.round(2),
+        previous_actual_rpe:      source_section&.actual_rpe&.round(1),
+        previous_feito:           source_section&.feito
       }
     end
   end
