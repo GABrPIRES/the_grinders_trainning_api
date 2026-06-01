@@ -39,12 +39,16 @@ class Api::V1::CoachDashboardController < ApplicationController
                                                .joins(section: { exercicio: :treino })
                                                .where(treinos: { personal_id: @personal.id })
                                                .count
+    # Lista das weeks que têm pelo menos 1 sugestão pending (pra tooltip + link no KPI)
+    pending_ai_reviews_items = ai_review_items_with_pending(@personal.id)
 
     # 5b. Status agregado dos feedbacks dos alunos deste coach (sprint 011)
     feedbacks_scope = WeeklyFeedback.joins(week: { training_block: :personal })
                                     .where(personals: { id: @personal.id })
     ai_processing_count = feedbacks_scope.where(ai_status: WeeklyFeedback.ai_statuses[:processing]).count
     ai_failed_count     = feedbacks_scope.where(ai_status: WeeklyFeedback.ai_statuses[:failed]).count
+    ai_processing_items = ai_feedback_items_for(@personal.id, :processing)
+    ai_failed_items     = ai_feedback_items_for(@personal.id, :failed)
 
     # 6. Dados para o gráfico conforme período solicitado
     start_date = period.days.ago.beginning_of_day
@@ -80,8 +84,11 @@ class Api::V1::CoachDashboardController < ApplicationController
       total_students_count:         total_students_count,
       overdue_payments_count:       overdue_payments_count,
       pending_ai_reviews_count:     pending_ai_reviews_count,
+      pending_ai_reviews_items:     pending_ai_reviews_items,
       ai_processing_count:          ai_processing_count,
+      ai_processing_items:          ai_processing_items,
       ai_failed_count:              ai_failed_count,
+      ai_failed_items:              ai_failed_items,
       revenue_chart_data:           revenue_chart_data
     }
   end
@@ -242,5 +249,50 @@ class Api::V1::CoachDashboardController < ApplicationController
   def authorize_coach!
     return if @current_user.personal?
     render json: { error: 'Acesso restrito a coaches.' }, status: :forbidden
+  end
+
+  # Lista de feedbacks num status específico (:processing ou :failed)
+  # com info pra montar link/tooltip no dashboard.
+  # target_week_id = a NEW_WEEK (week_number + 1) — pra onde o coach quer ir
+  # quando clica no badge. Se ainda não existe, cai pra source_week.
+  def ai_feedback_items_for(personal_id, status_sym)
+    WeeklyFeedback
+      .joins(week: { training_block: [:personal, { aluno: :user }] })
+      .where(personals: { id: personal_id })
+      .where(ai_status: WeeklyFeedback.ai_statuses[status_sym])
+      .pluck(
+        "users.name",
+        "alunos.id",
+        "training_blocks.id",
+        "weeks.id",
+        "weeks.week_number"
+      )
+      .map do |aluno_name, aluno_id, block_id, source_week_id, source_week_number|
+        target_week = Week.find_by(training_block_id: block_id, week_number: source_week_number + 1)
+        {
+          aluno_id:        aluno_id,
+          aluno_name:      aluno_name,
+          block_id:        block_id,
+          target_week_id:  target_week&.id || source_week_id
+        }
+      end
+  end
+
+  # Weeks que têm pelo menos 1 AiLoadSuggestion pendente — pra montar link/tooltip
+  # do badge "X prontas" no dashboard.
+  def ai_review_items_with_pending(personal_id)
+    AiLoadSuggestion.pending
+      .joins(section: { exercicio: { treino: { week: { training_block: [:personal, { aluno: :user }] } } } })
+      .where(personals: { id: personal_id })
+      .distinct
+      .pluck(
+        "users.name",
+        "alunos.id",
+        "training_blocks.id",
+        "weeks.id"
+      )
+      .map do |aluno_name, aluno_id, block_id, week_id|
+        { aluno_id: aluno_id, aluno_name: aluno_name, block_id: block_id, target_week_id: week_id }
+      end
   end
 end
