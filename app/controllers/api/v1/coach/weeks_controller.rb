@@ -5,16 +5,22 @@ class Api::V1::Coach::WeeksController < ApplicationController
   before_action :set_and_authorize_week
 
   # GET /api/v1/coach/weeks/:id/review
-  # Retorna a semana em draft com sugestões da IA agrupadas por treino.
+  # Retorna a semana em draft com sugestões da IA agrupadas por treino + contexto
+  # da semana anterior (o que o aluno fez de verdade) para o coach ter visão
+  # completa ao decidir cargas.
   def review
+    source_week = previous_week_of(@week)
+    source_treinos_by_name = source_week ? source_week.treinos.includes(exercicios: :sections).index_by(&:name) : {}
+
     treinos_data = @week.treinos.draft.includes(exercicios: { sections: :ai_load_suggestions }).map do |treino|
+      source_treino = source_treinos_by_name[treino.name]
       {
         treino_id: treino.id,
         treino_name: treino.name,
         treino_day: treino.day,
         ai_observation: treino.ai_observation,
         pending_count: treino.ai_load_suggestions.pending.count,
-        exercicios: build_exercicios_diff(treino)
+        exercicios: build_exercicios_diff(treino, source_treino)
       }
     end
 
@@ -75,12 +81,22 @@ class Api::V1::Coach::WeeksController < ApplicationController
     render json: { error: "Semana não encontrada." }, status: :not_found
   end
 
-  def build_exercicios_diff(treino)
-    treino.exercicios.map do |exercicio|
+  # Semana anterior do mesmo bloco. Usada para puxar o "que o aluno fez"
+  # (actual_load, actual_rpe, observation) e mostrar ao coach na revisão da IA.
+  def previous_week_of(week)
+    week.training_block.weeks.find_by(week_number: week.week_number - 1)
+  end
+
+  def build_exercicios_diff(treino, source_treino)
+    source_exercicios = source_treino ? source_treino.exercicios.to_a : []
+    treino.exercicios.each_with_index.map do |exercicio, idx|
+      source_ex = source_exercicios.find { |se| se.name == exercicio.name } || source_exercicios[idx]
       {
         exercicio_id: exercicio.id,
         exercicio_name: exercicio.name,
-        sections: build_sections_diff(exercicio)
+        # Observação do aluno na semana ANTERIOR (do exercicio fonte).
+        previous_observation: source_ex&.observation,
+        sections: build_sections_diff(exercicio, source_ex)
       }
     end
   end
@@ -95,9 +111,11 @@ class Api::V1::Coach::WeeksController < ApplicationController
     end
   end
 
-  def build_sections_diff(exercicio)
-    exercicio.sections.map do |section|
+  def build_sections_diff(exercicio, source_exercicio)
+    source_sections = source_exercicio ? source_exercicio.sections.to_a : []
+    exercicio.sections.each_with_index.map do |section, idx|
       suggestion = section.ai_load_suggestions.order(created_at: :desc).first
+      source_section = source_sections[idx]
       {
         section_id: section.id,
         reps: section.reps,
@@ -107,7 +125,13 @@ class Api::V1::Coach::WeeksController < ApplicationController
         suggested_load: suggestion&.suggested_load,
         suggestion_id: suggestion&.id,
         suggestion_status: suggestion&.status,
-        critical: suggestion&.critical || false
+        critical: suggestion&.critical || false,
+        # Contexto da semana anterior (o que o aluno fez):
+        previous_prescribed_load: source_section&.carga,
+        previous_prescribed_rpe:  source_section&.rpe,
+        previous_actual_load:     source_section&.actual_load,
+        previous_actual_rpe:      source_section&.actual_rpe,
+        previous_feito:           source_section&.feito
       }
     end
   end
