@@ -129,6 +129,8 @@ class Api::V1::Coach::TreinosController < ApplicationController
         exercicio_id: exercicio.id,
         exercicio_name: exercicio.name,
         previous_observation: source_ex&.observation,
+        # Feito é por EXERCÍCIO (botão único do aluno).
+        previous_feito: source_ex ? source_ex.sections.any?(&:feito) : nil,
         sections: build_sections_diff(exercicio, source_ex)
       }
     end
@@ -152,8 +154,7 @@ class Api::V1::Coach::TreinosController < ApplicationController
         previous_prescribed_load: source_section&.carga&.round(2),
         previous_prescribed_rpe:  source_section&.rpe&.round(1),
         previous_actual_load:     source_section&.actual_load&.round(2),
-        previous_actual_rpe:      source_section&.actual_rpe&.round(1),
-        previous_feito:           source_section&.feito
+        previous_actual_rpe:      source_section&.actual_rpe&.round(1)
       }
     end
   end
