@@ -90,11 +90,14 @@ class Api::V1::WeeksController < ApplicationController
           personal_id: @current_user.personal.id # Se sua tabela ainda usa isso
         )
 
-        # Copia Exercícios e Séries (preserva position do source)
+        # Copia Exercícios e Séries (preserva position, coach_comment e video_link do source).
+        # observation NÃO é copiada (campo do aluno — começa nil na nova semana).
         source_treino.exercicios.order(:position, :created_at).each do |source_ex|
           new_ex = new_treino.exercicios.create!(
             name: source_ex.name,
-            position: source_ex.position
+            position: source_ex.position,
+            coach_comment: source_ex.coach_comment,
+            video_link: source_ex.video_link
           )
 
           source_ex.sections.order(:created_at).each do |sec|

@@ -171,8 +171,10 @@ class WeeklyDuplicationService
   def duplicate_exercicio(exercicio, new_treino)
     new_treino.exercicios.create!(
       name: exercicio.name,
-      position: exercicio.position
-      # observation starts nil — fresh week, fresh notes
+      position: exercicio.position,
+      coach_comment: exercicio.coach_comment,
+      video_link: exercicio.video_link
+      # observation starts nil — fresh week, fresh notes do aluno
     )
   end
 

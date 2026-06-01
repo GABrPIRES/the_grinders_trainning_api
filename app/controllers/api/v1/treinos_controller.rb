@@ -93,11 +93,14 @@ class Api::V1::TreinosController < ApplicationController
 
       new_treino.save!
 
-      # 3. Copia Exercícios e Sections (preserva position do source)
+      # 3. Copia Exercícios e Sections (preserva position, coach_comment e video_link do source).
+      #    observation NÃO é copiada (campo do aluno — começa nil na nova semana).
       @treino.exercicios.includes(:sections).each do |source_exercicio|
         new_exercicio = new_treino.exercicios.create!(
           name: source_exercicio.name,
-          position: source_exercicio.position
+          position: source_exercicio.position,
+          coach_comment: source_exercicio.coach_comment,
+          video_link: source_exercicio.video_link
         )
 
         source_exercicio.sections.each do |source_section|

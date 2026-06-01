@@ -65,7 +65,10 @@ class Api::V1::TrainingBlocksController < ApplicationController
           source_treino.exercicios.includes(:sections).order(:position, :created_at).each do |source_ex|
             new_ex = new_treino.exercicios.create!(
               name: source_ex.name,
-              position: source_ex.position
+              position: source_ex.position,
+              coach_comment: source_ex.coach_comment,
+              video_link: source_ex.video_link
+              # observation NÃO é copiada (campo do aluno — começa nil na nova semana)
             )
 
             source_ex.sections.each do |sec|
