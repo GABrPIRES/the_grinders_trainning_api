@@ -44,7 +44,7 @@ gem "roo"
 group :development, :test do
   # Use spring for fast test runs.
   gem "spring"
-  gem "spring-watcher-listen", "~> 2.0.0"
+  gem "spring-watcher-listen", "~> 2.1.0"
   gem "mutex_m"
 
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
